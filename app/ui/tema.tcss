@@ -1,0 +1,140 @@
+/* Eliza V3 -- estética de consola: fondo negro, verde terminal, cian para datos,
+   magenta para etiquetas y dorado para el logo y los marcos de ventanas. */
+
+Screen {
+    background: #000000;
+    color: #00ff00;
+}
+
+#cabecera {
+    height: 7;
+    padding: 1 2 0 2;
+}
+#logo {
+    width: auto;
+    padding-right: 4;
+}
+#info {
+    width: 1fr;
+    border-left: vkey #555555;
+    padding-left: 2;
+}
+
+#resultados {
+    height: 1fr;
+    margin: 1 1 0 1;
+    background: #0a0a0a;
+    border: round #1f5f1f;
+    scrollbar-color: #00aa00;
+}
+#resultados > .datatable--header {
+    background: #000000;
+    color: #00ff00;
+    text-style: bold;
+}
+#resultados > .datatable--cursor {
+    background: #00aa00;
+    color: #000000;
+    text-style: bold;
+}
+#resultados > .datatable--even-row {
+    background: #0f0f0f;
+}
+
+#registro {
+    height: 7;
+    margin: 0 1;
+    background: #050505;
+    border: round #333333;
+    border-title-color: #888888;
+}
+
+#barra {
+    height: 3;
+    margin: 0 1;
+}
+#prompt {
+    width: 8;
+    padding: 1 0 0 1;
+    color: #00ff00;
+    text-style: bold;
+}
+#linea {
+    width: 1fr;
+    background: #000000;
+    color: #00ff00;
+    border: tall #00aa00;
+}
+#linea:focus {
+    border: tall #00ff00;
+}
+#linea > .input--placeholder {
+    color: #2f6f2f;
+}
+#linea > .input--suggestion {
+    color: #2f6f2f;
+}
+
+Footer {
+    background: #000000;
+}
+Footer > .footer--key {
+    background: #00aa00;
+    color: #000000;
+}
+
+/* ---- ventanas emergentes ---- */
+ModalScreen {
+    align: center middle;
+    background: #000000 60%;
+}
+.modal {
+    width: 84;
+    max-width: 95%;
+    height: auto;
+    max-height: 90%;
+    background: #000000;
+    border: heavy #ffd700;
+    border-title-color: #ffd700;
+    border-title-style: bold;
+    border-subtitle-color: #888888;
+    padding: 1 2;
+}
+.modal .mensaje {
+    color: #00ffff;
+    margin-bottom: 1;
+}
+.modal .error {
+    color: #ff5555;
+    height: auto;
+}
+.modal Input {
+    background: #0a0a0a;
+    color: #00ffff;
+    border: tall #00aa00;
+    margin-bottom: 1;
+}
+.modal Input:focus {
+    border: tall #00ff00;
+}
+.modal OptionList {
+    background: #000000;
+    border: none;
+    height: auto;
+    max-height: 12;
+    color: #00ff00;
+}
+.modal OptionList > .option-list--option-highlighted {
+    background: #00aa00;
+    color: #000000;
+    text-style: bold;
+}
+.modal.ancho {
+    width: 110;
+}
+#reporte {
+    height: auto;
+    max-height: 30;
+    background: #050505;
+    border: none;
+}

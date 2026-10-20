@@ -65,14 +65,14 @@ class PantallaScanACD(PantallaTabla):
         self.titulo(f"SCAN ACD  ·  {self.carpeta or '(sin carpeta)'}  ·  {self.tabla.row_count} archivo(s)  ·  "
                     f"orden: {'fecha' if self.por_fecha else 'nombre'}")
 
-    @work(exclusive=True, group="scan")
+    @work(exclusive=True, group="scan", exit_on_error=False)
     async def action_otra_carpeta(self):
         carpeta = await self.app.push_screen_wait(PedirCarpeta(
             "Scan ACD", "Carpeta donde buscar proyectos .ACD / .L5K (incluye subcarpetas).", self.carpeta or ""))
         if carpeta:
             self.escanear(carpeta)
 
-    @work(exclusive=True, group="scan")
+    @work(exclusive=True, group="scan", exit_on_error=False)
     async def escanear(self, carpeta):
         self.carpeta = carpeta
         self.estado("Buscando… (las carpetas de red pueden tardar)")
@@ -105,7 +105,7 @@ class PantallaScanACD(PantallaTabla):
         if r:
             self._abrir(os.path.dirname(r['fullpath']))
 
-    @work(exclusive=True, group="scan")
+    @work(exclusive=True, group="scan", exit_on_error=False)
     async def action_registrar(self):
         r = self._actual()
         if not r:

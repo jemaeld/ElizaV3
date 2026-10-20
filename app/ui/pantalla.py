@@ -111,6 +111,11 @@ class PantallaTabla(Screen):
         if self.ACCION_ENTER:
             getattr(self, f"action_{self.ACCION_ENTER}")()
 
+    def on_worker_state_changed(self, evento):
+        # Los errores de tareas en segundo plano de esta pantalla se reportan
+        # en Eliza (aviso + eliza_error.log) en vez de cerrarla.
+        self.app.on_worker_state_changed(evento)
+
     def action_a_filtro(self):
         self.query_one("#filtro", Input).focus()
 

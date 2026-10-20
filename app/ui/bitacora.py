@@ -174,7 +174,7 @@ class PantallaBitacora(PantallaTabla):
         self.estado("")
         self.refrescar(conservar=False)
 
-    @work(exclusive=True, group="bitacora")
+    @work(exclusive=True, group="bitacora", exit_on_error=False)
     async def action_nuevo(self):
         hoy = datetime.now().strftime("%Y-%m-%d")
         guardado = await capturar(self.app, self.carpeta, None if self.fecha == hoy else self.fecha)
@@ -185,7 +185,7 @@ class PantallaBitacora(PantallaTabla):
             self.tabla.move_cursor(row=self.tabla.row_count - 1)
             self.estado("Registro guardado.")
 
-    @work(exclusive=True, group="bitacora")
+    @work(exclusive=True, group="bitacora", exit_on_error=False)
     async def action_editar(self):
         i, original = self._actual()
         if original is None:
@@ -207,7 +207,7 @@ class PantallaBitacora(PantallaTabla):
         self.estado("Registro actualizado." if datos['fecha'] == self.fecha
                     else f"Registro movido a bitacora/{datos['fecha']}.json")
 
-    @work(exclusive=True, group="bitacora")
+    @work(exclusive=True, group="bitacora", exit_on_error=False)
     async def action_borrar(self):
         i, r = self._actual()
         if r is None:
@@ -237,7 +237,7 @@ class PantallaBitacora(PantallaTabla):
         self.estado(f"Copiado al portapapeles ({len(self.registros)} registro(s)). Pégalo en Excel."
                     if ok else "No se pudo copiar al portapapeles.", error=not ok)
 
-    @work(exclusive=True, group="bitacora")
+    @work(exclusive=True, group="bitacora", exit_on_error=False)
     async def action_exportar(self):
         if not self.registros:
             self.estado("No hay registros para exportar.", error=True)

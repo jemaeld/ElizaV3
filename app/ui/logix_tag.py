@@ -36,12 +36,17 @@ class SugeridorLista(Suggester):
         self.proveedor = proveedor
 
     async def get_suggestion(self, valor):
-        if not valor:
+        # Corre en segundo plano: si la ventana ya se cerró o algo falla,
+        # simplemente no hay sugerencia (nunca debe tumbar Eliza).
+        try:
+            if not valor:
+                return None
+            raiz = valor.lower()
+            for nombre in list(self.proveedor()):
+                if nombre.lower().startswith(raiz) and len(nombre) > len(valor):
+                    return valor + nombre[len(valor):]
+        except Exception:
             return None
-        raiz = valor.lower()
-        for nombre in self.proveedor():
-            if nombre.lower().startswith(raiz) and len(nombre) > len(valor):
-                return valor + nombre[len(valor):]
         return None
 
 
@@ -63,6 +68,7 @@ class AsistenteTag(_Base):
         self.inicial = {'ip': ip, 'scope': PROGRAMA if programa else CONTROLADOR, 'programa': programa or '',
                         'tag': nombre, 'polling': str(polling_ms or 100), 'comentario': comentario}
         self.tags_controlador, self.programas, self.tags_programa = [], [], []
+        self.scope = self.inicial['scope']   # se guarda aquí: las sugerencias lo leen sin tocar la pantalla
         self.ip_consultada = None
         self.campo_lista = None   # 'programa' o 'tag': a qué campo alimenta la lista
 
@@ -101,7 +107,7 @@ class AsistenteTag(_Base):
         return ["#ip", "#scope"] + (["#programa"] if self._es_programa() else []) + ["#tag", "#polling", "#comentario"]
 
     def _es_programa(self):
-        return self.query_one("#scope", Select).value == PROGRAMA
+        return self.scope == PROGRAMA
 
     def _base_tags(self):
         return self.tags_programa if self._es_programa() else self.tags_controlador
@@ -139,6 +145,7 @@ class AsistenteTag(_Base):
     # ---------------------------------------------------------
     # Eventos
     def on_select_changed(self, evento: Select.Changed):
+        self.scope = evento.value
         self._aplicar_scope()
         self._actualizar_ruta()
 
@@ -147,6 +154,7 @@ class AsistenteTag(_Base):
         if campo == "tag":
             programa, nombre = logix_tools.separar_ruta(evento.value)
             if programa:  # se pegó una ruta completa: se reparte en los campos
+                self.scope = PROGRAMA
                 self.query_one("#scope", Select).value = PROGRAMA
                 self.query_one("#programa", Input).value = programa
                 evento.input.value = nombre

@@ -5,9 +5,9 @@ logix.py -- /logix [ip|nombre]: MONITOR DE VARIABLES Allen-Bradley.
 
 Teclas:
     a           agregar tag (asistente con programas/tags leídos del PLC)
-    Enter / e   editar el tag de la fila (asistente)
+    Enter / w   escribir en la variable 1..N veces (ventana de escritura)
+    e           editar el tag de la fila (asistente)
     Espacio     conectar / desconectar la fila
-    w           escribir en la variable 1..N veces (ventana de escritura)
     Supr        quitar la fila           s   detener todas las escrituras
     g           guardar el conjunto de tags en la base (con nombre)
     l           cargar un conjunto guardado (o importar un .json de Eliza V2)
@@ -40,12 +40,12 @@ SIMBOLOS = {lm.OFF: ("○ OFF", "#ffcc00"), lm.CONECTANDO: ("… ", "#ffcc00"),
 class PantallaLogix(PantallaTabla):
     COLUMNAS = [('conexion', "CONEX", 7), ('ip', "IP", 16), ('polling', "POLL", 6), ('tag', "TAG", 42),
                 ('valor', "VALOR", 18), ('escritura', "ESCRITURA", 22), ('comentario', "COMENTARIO", None)]
-    ACCION_ENTER = "editar"
+    ACCION_ENTER = "escribir"
     BINDINGS = PantallaTabla.BINDINGS + [
         Binding("a", "agregar", "Agregar"),
-        Binding("e", "editar", show=False),
+        Binding("e", "editar", "Editar tag"),
         Binding("space", "conectar", "Conectar", key_display="Espacio"),
-        Binding("w", "escribir", "Escribir"),
+        Binding("w", "escribir", "Escribir", show=False),
         Binding("delete", "quitar", "Quitar", key_display="Supr"),
         Binding("s", "detener", "Detener escrituras"),
         Binding("g", "guardar", "Guardar"),
@@ -125,7 +125,7 @@ class PantallaLogix(PantallaTabla):
         return self.monitor.fila(int(clave)) if clave is not None else None
 
     # ---------------------------------------------------------
-    @work(exclusive=True, group="logix")
+    @work(exclusive=True, group="logix", exit_on_error=False)
     async def action_agregar(self):
         actual = self._actual()
         ip = (actual or {}).get('ip') or self.ultima_ip
@@ -137,7 +137,7 @@ class PantallaLogix(PantallaTabla):
             self._ir_a(id_fila)
             self._conectar(id_fila)
 
-    @work(exclusive=True, group="logix")
+    @work(exclusive=True, group="logix", exit_on_error=False)
     async def action_editar(self):
         f = self._actual()
         if not f:
@@ -176,7 +176,7 @@ class PantallaLogix(PantallaTabla):
         if f:
             self.app.push_screen(VentanaEscritura(self.monitor, f['id']))
 
-    @work(exclusive=True, group="logix")
+    @work(exclusive=True, group="logix", exit_on_error=False)
     async def action_quitar(self):
         f = self._actual()
         if not f:
@@ -193,7 +193,7 @@ class PantallaLogix(PantallaTabla):
 
     # ---------------------------------------------------------
     # Conjuntos de tags guardados en la base
-    @work(exclusive=True, group="logix")
+    @work(exclusive=True, group="logix", exit_on_error=False)
     async def action_guardar(self):
         filas = self.monitor.instantanea()
         if not filas:
@@ -213,7 +213,7 @@ class PantallaLogix(PantallaTabla):
             return
         self.estado(f"Guardado '{nombre.strip()}' con {len(tags)} tag(s). Las escrituras no se guardan.")
 
-    @work(exclusive=True, group="logix")
+    @work(exclusive=True, group="logix", exit_on_error=False)
     async def action_cargar(self):
         registros = self.bd.logix_registros()
         opciones = [(r['nombre'], f"{r['nombre']}  ({len(r['tags'])} tags · {r['modificado'][:10]})") for r in registros]
@@ -262,7 +262,7 @@ class PantallaLogix(PantallaTabla):
         self.estado(f"Cargados {len(tags)} tag(s), desconectados. Espacio conecta cada fila.")
 
     # ---------------------------------------------------------
-    @work(exclusive=True, group="logix")
+    @work(exclusive=True, group="logix", exit_on_error=False)
     async def action_cerrar(self):
         if self.monitor.hay_escrituras() and not await self.app.push_screen_wait(Confirmar(
                 "Cerrar monitor", "Hay escrituras en curso. ¿Detenerlas y cerrar?", si="Cerrar", no="Seguir aquí")):

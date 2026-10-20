@@ -122,6 +122,25 @@ class ElizaApp(App):
         self.arranque()
 
     # ---------------------------------------------------------
+    # Errores en tareas de segundo plano: se informan y Eliza sigue abierta
+    def on_worker_state_changed(self, evento):
+        from textual.worker import WorkerState
+        if evento.state != WorkerState.ERROR:
+            return
+        error = evento.worker.error
+        ruta = os.path.join(rutas.ruta_instalacion(), "eliza_error.log")
+        try:
+            with open(ruta, 'a', encoding='utf-8') as f:
+                f.write(f"\n=== {datetime.now():%Y-%m-%d %H:%M:%S} | tarea {evento.worker.name}\n")
+                f.write("".join(traceback.format_exception(type(error), error, error.__traceback__)))
+        except OSError:
+            pass
+        try:
+            self.aviso(f"Error inesperado: {error} (detalle en {ruta})")
+        except Exception:
+            pass
+
+    # ---------------------------------------------------------
     # Mensajes
     def ok(self, texto):
         self.query_one("#registro", RichLog).write(Text.assemble(("[*] ", "bold #00ff00"), (texto, "#00ffff")))
@@ -143,7 +162,7 @@ class ElizaApp(App):
 
     # ---------------------------------------------------------
     # Arranque: carpeta de datos -> base -> contraseña
-    @work(exclusive=True, group="arranque")
+    @work(exclusive=True, group="arranque", exit_on_error=False)
     async def arranque(self, cambiar_carpeta=False):
         linea = self.query_one("#linea")
         linea.disabled = True
@@ -448,22 +467,22 @@ class ElizaApp(App):
         lineas += ["", f"[dim]Datos: {self.carpeta}[/]"]
         self.push_screen(modales.Reporte("Ayuda", "\n".join(lineas)))
 
-    @work(exclusive=True, group="pantalla")
+    @work(exclusive=True, group="pantalla", exit_on_error=False)
     async def cmd_edit(self, arg):
         if await self.push_screen_wait(PantallaEditor(self.bd, arg or None)):
             self.recargar()
 
-    @work(exclusive=True, group="pantalla")
+    @work(exclusive=True, group="pantalla", exit_on_error=False)
     async def cmd_add(self, arg):
         if await alta.alta(self, self.bd, arg or None):
             self.recargar()
 
-    @work(exclusive=True, group="pantalla")
+    @work(exclusive=True, group="pantalla", exit_on_error=False)
     async def cmd_scan_acd(self, arg):
         if await self.push_screen_wait(PantallaScanACD(self.bd, arg or None)):
             self.recargar()
 
-    @work(exclusive=True, group="pantalla")
+    @work(exclusive=True, group="pantalla", exit_on_error=False)
     async def cmd_bitacora(self, arg):
         if not arg:
             await bitacora.capturar(self, self.carpeta)
@@ -474,7 +493,7 @@ class ElizaApp(App):
             return
         await self.push_screen_wait(bitacora.PantallaBitacora(self.carpeta, fecha))
 
-    @work(exclusive=True, group="pantalla")
+    @work(exclusive=True, group="pantalla", exit_on_error=False)
     async def cmd_logix(self, arg):
         ip = ""
         if arg:
@@ -490,7 +509,7 @@ class ElizaApp(App):
     def cmd_salir(self, arg):
         self.exit(0)
 
-    @work(exclusive=True, group="update")
+    @work(exclusive=True, group="update", exit_on_error=False)
     async def cmd_update(self, arg):
         instalador_ruta = os.path.join(rutas.ruta_instalacion(), "Eliza.py")
         if os.path.isdir(os.path.join(rutas.ruta_instalacion(), ".git")):

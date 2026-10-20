@@ -93,14 +93,14 @@ class PantallaEditor(PantallaTabla):
              Campo('info', "Info", e.get('info', '')),
              Campo('comentario', "Comentario", e.get('comentario', ''))])
 
-    @work(exclusive=True, group="editor")
+    @work(exclusive=True, group="editor", exit_on_error=False)
     async def action_editar(self):
         entrada = self._seleccionada()
         if not entrada:
             return
         await self._guardar(await self.app.push_screen_wait(self._formulario(entrada)), entrada['id'])
 
-    @work(exclusive=True, group="editor")
+    @work(exclusive=True, group="editor", exit_on_error=False)
     async def action_nueva(self):
         await self._guardar(await self.app.push_screen_wait(self._formulario()), None)
 
@@ -123,7 +123,7 @@ class PantallaEditor(PantallaTabla):
             pass
         self.estado(f"Guardado: {datos['nombre']}")
 
-    @work(exclusive=True, group="editor")
+    @work(exclusive=True, group="editor", exit_on_error=False)
     async def action_borrar(self):
         entrada = self._seleccionada()
         if not entrada:

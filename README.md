@@ -63,9 +63,9 @@ actualiza en vivo. Cada fila es una conexión propia.
 | Tecla | Qué hace |
 |---|---|
 | `a` | agregar tag: asistente con IP, Scope **Principal / Subprograma**, Programa y Tag. Lee del PLC los programas y tags (en segundo plano) y los ofrece mientras escribes: ↓ entra a la lista, → acepta la sugerencia. Pegar `Program:X.Y` lo reparte solo |
-| Enter / `e` | editar el tag de la fila con el mismo asistente |
+| `e` | editar el tag de la fila con el mismo asistente |
 | Espacio | conectar / desconectar (`● ON` · `○ OFF` · `× ERR`) |
-| `w` | **escribir** 1..N veces (o continuo) al ritmo del polling, con indicador **IDLE → WORKING n/N → DONE**, progreso y bitácora de cada escritura. Esc cierra la ventana y la escritura sigue |
+| Enter / `w` | **escribir** 1..N veces (o continuo) al ritmo del polling, con indicador **IDLE → WORKING n/N → DONE**, progreso y bitácora de cada escritura. Esc cierra la ventana y la escritura sigue |
 | `s` | detener todas las escrituras |
 | `g` · `l` | guardar / cargar conjuntos de tags en la base (o importar un `.json` de V2) |
 | Supr | quitar la fila |

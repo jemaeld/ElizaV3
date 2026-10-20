@@ -39,6 +39,11 @@ class _Base(ModalScreen):
     def action_cancelar(self):
         self.dismiss(None)
 
+    def on_worker_state_changed(self, evento):
+        # Los errores de tareas en segundo plano de esta pantalla se reportan
+        # en Eliza (aviso + eliza_error.log) en vez de cerrarla.
+        self.app.on_worker_state_changed(evento)
+
 
 # ---------------------------------------------------------
 class Menu(_Base):

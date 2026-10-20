@@ -41,6 +41,7 @@ import network_tools
 import rutas
 from ui import alta, bitacora, modales
 from ui.editor import PantallaEditor
+from ui.logix import PantallaLogix
 from ui.scan_acd import PantallaScanACD
 from ui.logo import logo
 
@@ -81,8 +82,8 @@ class ElizaApp(App):
     ENABLE_COMMAND_PALETTE = False
     BINDINGS = [
         Binding("f1", "ayuda", "Ayuda"),
-        Binding("f5", "recargar", "Recargar"),
-        Binding("ctrl+l", "limpiar", "Limpiar registro"),
+        Binding("f5", "recargar", "Recargar", show=False),
+        Binding("ctrl+l", "limpiar", "Limpiar registro", show=False),
         Binding("escape", "borrar_linea", "Borrar línea", show=False),
         Binding("ctrl+q", "salir", "Salir", priority=True),
     ]
@@ -465,6 +466,16 @@ class ElizaApp(App):
             return
         await self.push_screen_wait(bitacora.PantallaBitacora(self.bd, fecha))
 
+    @work(exclusive=True, group="pantalla")
+    async def cmd_logix(self, arg):
+        ip = ""
+        if arg:
+            ip, error = self.resolver_ip(arg)
+            if error:
+                self.aviso(error)
+                return
+        await self.push_screen_wait(PantallaLogix(self.bd, ip))
+
     def cmd_clear(self, arg):
         self.action_limpiar()
 
@@ -508,6 +519,7 @@ class ElizaApp(App):
 
     COMANDOS = {
         '/bitacora': ("Sin fecha: nuevo registro. Con fecha (hoy, ayer, DD, MM/DD): visor del día", cmd_bitacora),
+        '/logix':    ("Monitor de variables Allen-Bradley: leer y escribir 1..N veces (ip/nombre opcional)", cmd_logix),
         '/edit':     ("Editor de la base (opcional: vnc, apps, acd)", cmd_edit),
         '/add':      ("Agregar VNC/APPS desde un archivo .vnc, .lnk o .exe", cmd_add),
         '/scan_acd': ("Buscar proyectos ACD/L5K en una carpeta y registrarlos", cmd_scan_acd),

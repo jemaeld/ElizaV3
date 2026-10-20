@@ -46,11 +46,31 @@ Todo con teclado, desde la línea `ELIZA>`:
 | `/edit [vnc\|apps\|acd]` | editor de la base: Enter editar, n nueva, Supr borrar, c categoría, o orden, r reescanear ACD |
 | `/add` | agregar VNC/APPS eligiendo un .vnc/.lnk/.exe en un explorador de consola |
 | `/scan_acd [carpeta]` | buscar ACD/L5K y registrarlos (Enter), a abrir, u ubicación |
+| `/logix [ip\|nombre]` | **Monitor de variables** Allen-Bradley (ver abajo) |
 | `/ip` · `/ping` | red |
 | `/settings` · `/reload` · `/update` | carpeta de datos · recargar · actualizar |
 | `/clear` · `/help` · `/salir` | |
 
 En todas las pantallas: `/` filtra, Esc vuelve.
+
+### Monitor de variables (`/logix`)
+
+Tabla `CONEX | IP | POLL | TAG | VALOR | ESCRITURA | COMENTARIO`, que se
+actualiza en vivo. Cada fila es una conexión propia.
+
+| Tecla | Qué hace |
+|---|---|
+| `a` | agregar tag: asistente con IP, Scope **Principal / Subprograma**, Programa y Tag. Lee del PLC los programas y tags (en segundo plano) y los ofrece mientras escribes: ↓ entra a la lista, → acepta la sugerencia. Pegar `Program:X.Y` lo reparte solo |
+| Enter / `e` | editar el tag de la fila con el mismo asistente |
+| Espacio | conectar / desconectar (`● ON` · `○ OFF` · `× ERR`) |
+| `w` | **escribir** 1..N veces (o continuo) al ritmo del polling, con indicador **IDLE → WORKING n/N → DONE**, progreso y bitácora de cada escritura. Esc cierra la ventana y la escritura sigue |
+| `s` | detener todas las escrituras |
+| `g` · `l` | guardar / cargar conjuntos de tags en la base (o importar un `.json` de V2) |
+| Supr | quitar la fila |
+
+El detalle de la fila seleccionada (error exacto, escritura) va en la línea
+de estado de abajo. Cada ciclo escribe y luego lee, así el valor muestra el
+efecto de la escritura.
 
 ## Datos
 
@@ -78,7 +98,7 @@ es público: no requiere token.
       lanzador, primer arranque, contraseña, `/ip` `/ping` `/settings`
       `/reload` `/update`.
 - [x] **Fase 2**: editor de la base, alta (VNC/APPS), `/scan_acd`, bitácora.
-- [ ] **Fase 3**: `/logix` (monitor de variables + escritura 1..N + asistente
+- [x] **Fase 3**: `/logix` (monitor de variables + escritura 1..N + asistente
       de tags).
 
 ## Código
@@ -92,12 +112,14 @@ es público: no requiere token.
 | `app/ui/formulario.py` · `app/ui/pantalla.py` | formulario genérico y base de pantallas con tabla |
 | `app/ui/editor.py` · `app/ui/alta.py` · `app/ui/explorador.py` | editor de la base, /add y explorador de archivos |
 | `app/ui/scan_acd.py` · `app/ui/bitacora.py` | /scan_acd y bitácora |
+| `app/ui/logix.py` · `app/ui/logix_tag.py` · `app/ui/logix_escritura.py` | monitor de variables, asistente de tags y ventana de escritura |
+| `app/logix_monitor.py` | motor del monitor: un hilo por fila, lectura y escritura 1..N (sin interfaz) |
 | `app/ui/tema.tcss` · `app/ui/logo.py` | estilo de consola y logo dorado |
 | `app/db.py` | base SQLite (entradas, bitácora, config, registros logix) |
 | `app/migrar_v2.py` | migración de un solo uso desde V2 |
 | `app/rutas.py` · `app/licencia.py` | carpeta de datos y contraseña de acceso |
 | `app/acciones.py` | ejecutar entradas (VNC, apps, ACD) |
-| `app/acd_tools.py` · `app/add_tools.py` · `app/bitacora_tools.py` · `app/logix_*.py` · `app/network_tools.py` | lógica heredada de V2 |
+| `app/acd_tools.py` · `app/add_tools.py` · `app/bitacora_tools.py` · `app/logix_tools.py` · `app/logix_explorador.py` · `app/network_tools.py` | lógica heredada de V2 |
 
 **Agregar un comando:** en `app/ui/app.py`, método `cmd_xxx(self, arg)` y
 una línea en `COMANDOS`.

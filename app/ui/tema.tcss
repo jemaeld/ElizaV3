@@ -256,3 +256,100 @@ ModalScreen {
 .explorador DirectoryTree > .directory-tree--folder {
     color: #ffd700;
 }
+
+/* ---- logix ---- */
+.ruta {
+    margin: 1 0 0 0;
+    height: 1;
+}
+#lista {
+    height: 8;
+    margin-top: 1;
+    background: #050505;
+    border: round #1f5f1f;
+    color: #00ffff;
+}
+#lista:focus {
+    border: round #00ff00;
+}
+#lista > .option-list--option-highlighted {
+    background: #00aa00;
+    color: #000000;
+}
+.escritura {
+    width: 100;
+}
+.valor-grande {
+    height: 3;
+    margin: 1 0;
+    padding: 0 2;
+    background: #0a0a0a;
+    border: round #1f5f1f;
+}
+#barra {
+    width: 100%;
+}
+#barra Bar {
+    width: 1fr;
+}
+.parametros {
+    height: 1;
+    margin-bottom: 1;
+}
+.parametros .etiqueta {
+    width: auto;
+    padding-right: 1;
+}
+.modal .parametros Input {
+    height: 1;
+    width: 16;
+    border: none;
+    padding: 0 1;
+    margin: 0 3 0 0;
+    background: #141414;
+}
+.modal .parametros Input:focus {
+    background: #003300;
+    color: #ffffff;
+}
+.parametros Checkbox {
+    height: 1;
+    border: none;
+    padding: 0;
+    background: #000000;
+    color: #00ff00;
+}
+.indicador {
+    width: 100%;
+    height: 3;
+    margin: 1 0;
+    text-style: bold;
+    border: none;
+}
+.indicador.idle {
+    background: #333333;
+    color: #00ff00;
+}
+.indicador.working {
+    background: #ffcc00;
+    color: #000000;
+}
+.indicador.done {
+    background: #00aa00;
+    color: #000000;
+}
+.indicador:focus {
+    text-style: bold reverse;
+}
+#barra Bar > .bar--bar {
+    color: #00ff00;
+    background: #141414;
+}
+#barra Bar > .bar--complete {
+    color: #00ff00;
+}
+#historial {
+    height: 8;
+    background: #050505;
+    border: round #333333;
+}

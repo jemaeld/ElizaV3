@@ -33,6 +33,7 @@ from textual.containers import Horizontal
 from textual.widgets import DataTable, Footer, Input, RichLog, Static
 
 import acciones
+import bitacora_json
 import bitacora_tools
 import db
 import licencia
@@ -204,12 +205,19 @@ class ElizaApp(App):
                 return
 
         self.bd, self.carpeta = bd, carpeta
+        try:
+            rescatados = bitacora_json.rescatar_de_db(bd, carpeta)
+        except (bitacora_json.ErrorBitacora, db.ErrorDB, OSError) as e:
+            rescatados = 0
+            self.aviso(f"Bitácora: no se pudieron pasar a JSON los registros guardados en la base: {e}")
         self.modo_datos = "local (remota no disponible)" if respaldo else (
             "remota" if rutas.carpeta_remota() else "local")
         self.recargar(silencioso=True)
         if respaldo:
             self.aviso("Trabajando con datos LOCALES en esta sesión (la remota no estaba disponible).")
         self.ok(f"Base de datos: {self.bd.ruta}")
+        if rescatados:
+            self.ok(f"Bitácora: {rescatados} registro(s) capturados en V3 se pasaron a los archivos JSON del día.")
         linea.disabled = False
         linea.focus()
 
@@ -458,13 +466,13 @@ class ElizaApp(App):
     @work(exclusive=True, group="pantalla")
     async def cmd_bitacora(self, arg):
         if not arg:
-            await bitacora.capturar(self, self.bd)
+            await bitacora.capturar(self, self.carpeta)
             return
         fecha, error = bitacora_tools.resolver_fecha_arg(arg)
         if error:
             self.aviso(error)
             return
-        await self.push_screen_wait(bitacora.PantallaBitacora(self.bd, fecha))
+        await self.push_screen_wait(bitacora.PantallaBitacora(self.carpeta, fecha))
 
     @work(exclusive=True, group="pantalla")
     async def cmd_logix(self, arg):

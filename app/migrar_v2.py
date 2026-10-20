@@ -14,7 +14,7 @@ elegida tiene datos de V2 y todavía no tiene eliza.db.
 Qué migra (los archivos de V2 NO se modifican):
   config_json/*.json   -> tabla entradas (categoría = nombre del archivo)
                           name/action/info/ip/comentario; otras claves -> extra
-  bitacora/*.json      -> tabla bitacora
+  bitacora/*.json      -> NO se migra: V3 usa los mismos archivos JSON (mismo formato)
   eliza_config.json    -> tabla config (vnc_password, vnc_puerto, ...)
   _acd_store/          -> se queda donde está: las entradas ACD conservan su ruta
 
@@ -37,8 +37,6 @@ from datetime import datetime
 import db
 
 CLAVES_ENTRADA = {'name': 'nombre', 'action': 'accion', 'info': 'info', 'ip': 'ip', 'comentario': 'comentario'}
-CLAVES_BITACORA = ('fecha', 'hora', 'linea', 'estacion', 'prefijo', 'auditor', 'tiempo',
-                   'falla', 'ajuste', 'comentarios')
 CONFIG_OBSOLETA = ('carpeta_destino_acd',)
 
 
@@ -118,27 +116,11 @@ def leer_v2(origen, reporte, omitir_danados=False):
             reporte.aviso(f"config_json/{archivo}: {sin_nombre} entrada(s) sin 'name' se omitieron.")
         reporte.info(f"{categoria.upper():<6} {sum(1 for e in entradas if e['categoria'] == categoria):>5} entradas")
 
-    bitacora = []
     carpeta_bit = os.path.join(origen, 'bitacora')
-    archivos_dia = 0
-    if os.path.isdir(carpeta_bit):
-        for archivo in sorted(os.listdir(carpeta_bit)):
-            m = re.match(r'^(\d{4}-\d{2}-\d{2})\.json$', archivo)
-            if not m:
-                continue
-            datos = _leer_json(os.path.join(carpeta_bit, archivo), reporte, omitir_danados)
-            if datos is None:
-                continue
-            archivos_dia += 1
-            for r in datos if isinstance(datos, list) else []:
-                if not isinstance(r, dict):
-                    continue
-                registro = {c: str(r.get(c, '') or '') for c in CLAVES_BITACORA}
-                registro['fecha'] = registro['fecha'] or m.group(1)
-                registro['hora'] = registro['hora'] or '00:00:00'
-                registro['equipo'] = 'V2'
-                bitacora.append(registro)
-    reporte.info(f"BITÁCORA {len(bitacora):>4} registros de {archivos_dia} día(s)")
+    dias = [a for a in os.listdir(carpeta_bit) if re.match(r'^\d{4}-\d{2}-\d{2}\.json$', a)] \
+        if os.path.isdir(carpeta_bit) else []
+    reporte.info(f"BITÁCORA {len(dias):>4} día(s): se queda en bitacora\\*.json (V3 usa los mismos archivos)")
+    bitacora = []
 
     config = {}
     ruta_cfg = os.path.join(origen, 'eliza_config.json')
@@ -205,6 +187,7 @@ def migrar(origen, destino=None, simular=False, reemplazar=False, omitir_danados
             for clave, valor in datos['config'].items():
                 con.execute("INSERT INTO config (clave, valor) VALUES (?, ?)",
                             (clave, json.dumps(valor, ensure_ascii=False)))
+            con.execute("INSERT OR REPLACE INTO config (clave, valor) VALUES ('bitacora_en_json', 'true')")
             con.execute("INSERT OR REPLACE INTO config (clave, valor) VALUES ('migrado_desde_v2', ?)",
                         (json.dumps({'origen': origen, 'fecha': ahora}, ensure_ascii=False),))
 
@@ -218,8 +201,8 @@ def migrar(origen, destino=None, simular=False, reemplazar=False, omitir_danados
         shutil.rmtree(temporal_dir, ignore_errors=True)
 
     reporte.info("")
-    reporte.info(f"OK: {conteos['entradas']} entradas, {conteos['bitacora']} registros de bitácora, "
-                 f"{len(datos['config'])} clave(s) de configuración.")
+    reporte.info(f"OK: {conteos['entradas']} entradas y {len(datos['config'])} clave(s) de configuración. "
+                 "La bitácora sigue en sus archivos JSON.")
     reporte.info("Los archivos de V2 no se modificaron; V2 puede seguir usándolos.")
     ruta_reporte = os.path.join(destino, f"migracion_v2_{datetime.now():%Y%m%d-%H%M%S}.txt")
     try:

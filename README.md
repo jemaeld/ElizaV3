@@ -19,7 +19,9 @@ carpeta de datos.
    `.venv`, instala dependencias y arranca. Eliza pregunta la **carpeta de
    datos**: remota/compartida (la de red) o local.
 4. Si esa carpeta tiene datos de **Eliza V2** y todavía no tiene `eliza.db`,
-   Eliza ofrece **migrarlos** (una sola vez). Los archivos de V2 no se tocan.
+   Eliza ofrece **migrarlos** (una sola vez): VNC, APPS, ACD y configuración.
+   La bitácora no se migra (V3 usa los mismos JSON). Los archivos de V2 no se
+   tocan.
 5. Pide la **contraseña de acceso** (la misma que en V2).
 
 Recomendado: **Windows Terminal** (en Windows 11 viene por defecto). La
@@ -74,9 +76,14 @@ efecto de la escritura.
 
 ## Datos
 
-Todo vive en un solo archivo **`eliza.db`** (SQLite) dentro de la carpeta
-de datos, junto a `_acd_store\` (los proyectos ACD siguen siendo archivos,
-igual que en V2). Pensado para carpeta de red: transacciones cortas,
+La base (VNC, APPS, ACD, configuración, conjuntos de tags) vive en un solo
+archivo **`eliza.db`** (SQLite) dentro de la carpeta de datos, junto a
+`_acd_store\` (los proyectos ACD siguen siendo archivos, igual que en V2).
+
+La **bitácora** NO va en la base: se queda en `bitacora\YYYY-MM-DD.json`,
+un archivo por día, con el **formato exacto de V2** (mismas claves, mismo
+orden, mismo formato). V2, V3 y otros programas usan esos archivos a la vez;
+el visor de V3 se recarga solo si el archivo del día cambia. Pensado para carpeta de red: transacciones cortas,
 reintentos si otro equipo está escribiendo, y sin modo WAL (no es seguro
 sobre red).
 

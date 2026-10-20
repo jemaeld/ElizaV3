@@ -3,7 +3,11 @@ db.py
 ------
 Base de datos de Eliza V3: un solo archivo SQLite, eliza.db, dentro de la
 carpeta de datos (local o compartida en red). Reemplaza a los JSON de V2
-(config_json/*.json, bitacora/*.json, eliza_config.json).
+config_json/*.json y eliza_config.json.
+
+La BITÁCORA NO vive aquí: sigue en bitacora/YYYY-MM-DD.json con el formato
+exacto de V2 (ver bitacora_json.py), porque otros programas usan esos
+archivos. La tabla 'bitacora' quedó solo por compatibilidad y está vacía.
 
 Pensado para una carpeta de RED compartida por varios equipos:
 - journal_mode=DELETE (WAL no es seguro sobre SMB/carpetas de red).
@@ -17,7 +21,7 @@ _acd_store/ (la base guarda la ruta, igual que V2).
 
 Tablas:
     entradas  (VNC, APPS, ACD y cualquier categoría futura)
-    bitacora  (registros de turno)
+    bitacora  (sin uso: la bitácora está en JSON)
     config    (clave -> valor JSON)
     logix_registros (conjuntos de tags guardados del monitor)
 """

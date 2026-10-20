@@ -1,7 +1,7 @@
 """
 logix_tag.py -- asistente para agregar/editar un tag del Monitor de Variables.
 
-    IP          [10.140.126.30]          (al confirmar la IP se leen programas y tags del PLC)
+    IP          [192.168.1.10]           (al confirmar la IP se leen programas y tags del PLC)
     Scope       [Principal (Controlador) ▼]   o Subprograma
     Programa    [Estacion30]             (solo subprograma)
     Tag         [Timer_Soldadura.DN]
@@ -69,7 +69,7 @@ class AsistenteTag(_Base):
     def compose(self) -> ComposeResult:
         i = self.inicial
         caja = self.marco(
-            Grid(Label("IP", classes="etiqueta"), Input(i['ip'], id="ip", placeholder="10.140.x.x"),
+            Grid(Label("IP", classes="etiqueta"), Input(i['ip'], id="ip", placeholder="192.168.1.10"),
                  Label("Scope", classes="etiqueta"),
                  Select([("Principal (Controlador)", CONTROLADOR), ("Subprograma", PROGRAMA)],
                         value=i['scope'], allow_blank=False, id="scope"),

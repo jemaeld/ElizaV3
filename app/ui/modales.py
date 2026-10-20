@@ -201,6 +201,9 @@ class Confirmar(Menu):
         super().__init__(titulo, mensaje, [("si", si), ("no", no)])
 
     def on_option_list_option_selected(self, evento):
+        # Textual también llamaría al manejador de Menu (clase base): se evita,
+        # porque un segundo dismiss() cerraría la pantalla de abajo.
+        evento.prevent_default()
         self.dismiss(evento.option.id == "si")
 
     def action_cancelar(self):

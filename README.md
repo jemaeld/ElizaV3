@@ -8,7 +8,7 @@ Es la sucesora de [Eliza V2](https://github.com/jemaeld/Eliza), que sigue
 operando: las dos pueden convivir en el mismo equipo y apuntar a la misma
 carpeta de datos.
 
-> El nombre viene de Zelda **Eliza**beth. ✦
+> El nombre viene de Zelda **Eliza**beth.
 
 ## Instalar
 
@@ -39,8 +39,18 @@ Todo con teclado, desde la línea `ELIZA>`:
 | Esc | borra la línea |
 | F1 · F5 · Ctrl+L · Ctrl+Q | ayuda · recargar · limpiar registro · salir |
 
-Comandos de la fase 1: `/ip`, `/ping`, `/reload`, `/settings`, `/update`,
-`/clear`, `/help`, `/salir`.
+| Comando | Qué hace |
+|---|---|
+| `/bitacora` | captura un registro (formulario; fecha y hora automáticas) |
+| `/bitacora hoy` · `ayer` · `DD` · `MM/DD` · `YYYY-MM-DD` | visor del día: ←/→ cambia de día, n nuevo, Enter editar, Supr borrar, y copiar a Excel, x exportar .tsv |
+| `/edit [vnc\|apps\|acd]` | editor de la base: Enter editar, n nueva, Supr borrar, c categoría, o orden, r reescanear ACD |
+| `/add` | agregar VNC/APPS eligiendo un .vnc/.lnk/.exe en un explorador de consola |
+| `/scan_acd [carpeta]` | buscar ACD/L5K y registrarlos (Enter), a abrir, u ubicación |
+| `/ip` · `/ping` | red |
+| `/settings` · `/reload` · `/update` | carpeta de datos · recargar · actualizar |
+| `/clear` · `/help` · `/salir` | |
+
+En todas las pantallas: `/` filtra, Esc vuelve.
 
 ## Datos
 
@@ -67,7 +77,7 @@ es público: no requiere token.
 - [x] **Fase 1**: núcleo, base SQLite, migrador V2→V3, instalador,
       lanzador, primer arranque, contraseña, `/ip` `/ping` `/settings`
       `/reload` `/update`.
-- [ ] **Fase 2**: editor de la base, alta (VNC/APPS), `/scan_acd`, bitácora.
+- [x] **Fase 2**: editor de la base, alta (VNC/APPS), `/scan_acd`, bitácora.
 - [ ] **Fase 3**: `/logix` (monitor de variables + escritura 1..N + asistente
       de tags).
 
@@ -79,6 +89,9 @@ es público: no requiere token.
 | `app/eliza3.py` | punto de entrada |
 | `app/ui/app.py` | aplicación Textual: lanzador, comandos, arranque |
 | `app/ui/modales.py` | ventanas emergentes (menús, contraseña, carpetas) |
+| `app/ui/formulario.py` · `app/ui/pantalla.py` | formulario genérico y base de pantallas con tabla |
+| `app/ui/editor.py` · `app/ui/alta.py` · `app/ui/explorador.py` | editor de la base, /add y explorador de archivos |
+| `app/ui/scan_acd.py` · `app/ui/bitacora.py` | /scan_acd y bitácora |
 | `app/ui/tema.tcss` · `app/ui/logo.py` | estilo de consola y logo dorado |
 | `app/db.py` | base SQLite (entradas, bitácora, config, registros logix) |
 | `app/migrar_v2.py` | migración de un solo uso desde V2 |

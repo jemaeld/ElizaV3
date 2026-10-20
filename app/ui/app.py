@@ -33,12 +33,15 @@ from textual.containers import Horizontal
 from textual.widgets import DataTable, Footer, Input, RichLog, Static
 
 import acciones
+import bitacora_tools
 import db
 import licencia
 import migrar_v2
 import network_tools
 import rutas
-from ui import modales
+from ui import alta, bitacora, modales
+from ui.editor import PantallaEditor
+from ui.scan_acd import PantallaScanACD
 from ui.logo import logo
 
 VERSION = "ELIZA v3"
@@ -436,6 +439,32 @@ class ElizaApp(App):
         lineas += ["", f"[dim]Datos: {self.carpeta}[/]"]
         self.push_screen(modales.Reporte("Ayuda", "\n".join(lineas)))
 
+    @work(exclusive=True, group="pantalla")
+    async def cmd_edit(self, arg):
+        if await self.push_screen_wait(PantallaEditor(self.bd, arg or None)):
+            self.recargar()
+
+    @work(exclusive=True, group="pantalla")
+    async def cmd_add(self, arg):
+        if await alta.alta(self, self.bd, arg or None):
+            self.recargar()
+
+    @work(exclusive=True, group="pantalla")
+    async def cmd_scan_acd(self, arg):
+        if await self.push_screen_wait(PantallaScanACD(self.bd, arg or None)):
+            self.recargar()
+
+    @work(exclusive=True, group="pantalla")
+    async def cmd_bitacora(self, arg):
+        if not arg:
+            await bitacora.capturar(self, self.bd)
+            return
+        fecha, error = bitacora_tools.resolver_fecha_arg(arg)
+        if error:
+            self.aviso(error)
+            return
+        await self.push_screen_wait(bitacora.PantallaBitacora(self.bd, fecha))
+
     def cmd_clear(self, arg):
         self.action_limpiar()
 
@@ -478,6 +507,10 @@ class ElizaApp(App):
         self.exit(CODIGO_REINICIAR)
 
     COMANDOS = {
+        '/bitacora': ("Sin fecha: nuevo registro. Con fecha (hoy, ayer, DD, MM/DD): visor del día", cmd_bitacora),
+        '/edit':     ("Editor de la base (opcional: vnc, apps, acd)", cmd_edit),
+        '/add':      ("Agregar VNC/APPS desde un archivo .vnc, .lnk o .exe", cmd_add),
+        '/scan_acd': ("Buscar proyectos ACD/L5K en una carpeta y registrarlos", cmd_scan_acd),
         '/ip':       ("Interfaces de red de este equipo", cmd_ip),
         '/ping':     ("Ping a una IP o entrada VNC/ACD (ventana aparte)", cmd_ping),
         '/reload':   ("Vuelve a leer la base (si otro equipo la cambió)", cmd_reload),

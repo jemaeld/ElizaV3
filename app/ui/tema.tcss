@@ -138,3 +138,121 @@ ModalScreen {
     background: #050505;
     border: none;
 }
+
+/* ---- formularios ---- */
+.formulario {
+    width: 96;
+}
+.rejilla {
+    grid-size: 2;
+    grid-columns: 18 1fr;
+    grid-rows: 1;
+    grid-gutter: 1 0;
+    height: auto;
+}
+.rejilla .etiqueta {
+    color: #ff66ff;
+    text-style: bold;
+}
+/* campos compactos: una línea, sin marco; el campo activo se ilumina */
+.modal .rejilla Input {
+    height: 1;
+    border: none;
+    padding: 0 1;
+    margin: 0;
+    background: #141414;
+}
+.modal .rejilla Input:focus {
+    border: none;
+    background: #003300;
+    color: #ffffff;
+}
+.rejilla Select {
+    background: #0a0a0a;
+}
+.rejilla Select > SelectCurrent {
+    height: 1;
+    background: #141414;
+    color: #00ffff;
+    border: none;
+    padding: 0 1;
+}
+.rejilla Select:focus > SelectCurrent {
+    border: none;
+    background: #003300;
+    color: #ffffff;
+}
+.rejilla Select > SelectOverlay {
+    background: #000000;
+    color: #00ff00;
+    border: tall #00ff00;
+}
+
+/* ---- pantallas de trabajo (editor, bitácora, scan, logix) ---- */
+.pantalla-titulo {
+    height: 1;
+    margin: 1 1 0 1;
+    color: #ffd700;
+    text-style: bold;
+}
+.pantalla-tabla {
+    height: 1fr;
+    margin: 0 1;
+    background: #0a0a0a;
+    border: round #1f5f1f;
+    scrollbar-color: #00aa00;
+}
+.pantalla-tabla:focus {
+    border: round #00ff00;
+}
+.pantalla-tabla > .datatable--header {
+    background: #000000;
+    color: #00ff00;
+    text-style: bold;
+}
+.pantalla-tabla > .datatable--cursor {
+    background: #00aa00;
+    color: #000000;
+    text-style: bold;
+}
+.pantalla-tabla > .datatable--even-row {
+    background: #0f0f0f;
+}
+.pantalla-filtro {
+    margin: 0 1;
+    background: #000000;
+    color: #00ff00;
+    border: tall #1f5f1f;
+}
+.pantalla-filtro:focus {
+    border: tall #00ff00;
+}
+.pantalla-estado {
+    height: 1;
+    margin: 0 1;
+    background: #0a0a0a;
+    color: #00ffff;
+    padding: 0 1;
+}
+
+/* ---- explorador de archivos ---- */
+.explorador {
+    width: 100;
+    height: 32;
+}
+.explorador DirectoryTree {
+    height: 1fr;
+    background: #050505;
+    color: #00ffff;
+    border: round #1f5f1f;
+}
+.explorador DirectoryTree:focus {
+    border: round #00ff00;
+}
+.explorador DirectoryTree > .tree--cursor {
+    background: #00aa00;
+    color: #000000;
+}
+.explorador DirectoryTree > .directory-tree--folder {
+    color: #ffd700;
+}

@@ -162,13 +162,11 @@ def registrar_acd(bd, original_filepath, linea, estacion, ip):
     except Exception as e:
         return None, False, None, f"No se pudo copiar el archivo: {e}"
 
-    info = analyze_file(destino)
     nombre = nombre_entrada(linea, estacion)
     entrada = {
         "categoria": "acd",
         "nombre": nombre,
         "accion": f'open "{NOMBRE_CARPETA_PROTEGIDA}/{nombre_archivo}"',
-        "info": f"{ip} | {info.get('latest_ts_str', 'N/A')}",
         "ip": ip,
         "comentario": "",
     }
@@ -182,14 +180,3 @@ def registrar_acd(bd, original_filepath, linea, estacion, ip):
     except _db.ErrorDB as e:
         return None, False, destino, f"El archivo se copió, pero no se pudo guardar en la base: {e}"
     return entrada, existente is not None, destino, None
-
-
-def reescanear(destino, ip):
-    """
-    Relee la fecha de modificación del archivo ya protegido y arma el 'info'
-    de nuevo. Devuelve (info_string_nuevo, None) o (None, mensaje_error).
-    """
-    if not destino or not os.path.isfile(destino):
-        return None, f"No se encontró el archivo: {destino or '(ruta vacía)'}"
-    file_info = analyze_file(destino)
-    return f"{ip} | {file_info.get('latest_ts_str', 'N/A')}", None

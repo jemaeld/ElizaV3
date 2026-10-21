@@ -93,9 +93,3 @@ def analizar_archivo(ruta_original):
         }, None
 
     return None, f"Extensión no soportada: '{ext or '(sin extensión)'}'. Usa .vnc, .lnk o .exe."
-
-
-def guardar_entrada(bd, categoria, nombre, accion, info, ip):
-    """Agrega la entrada a la base. Lanza db.ErrorDB (p. ej. nombre repetido)."""
-    return bd.guardar_entrada({'categoria': categoria, 'nombre': nombre, 'accion': accion,
-                               'info': info, 'ip': ip})

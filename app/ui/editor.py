@@ -5,7 +5,6 @@ Teclas en la tabla:
     Enter / e   editar la entrada        n   nueva entrada
     Supr        borrar (pide confirmar)  c   cambiar categoría (Todas → VNC → APPS → ACD ...)
     o           cambiar orden (nombre / IP / categoría)
-    r           ACD: reescanear fechas de todos los archivos
     /           filtrar                  Esc volver
 
 Los cambios se guardan en la base al momento (no hay "guardar" aparte).
@@ -17,7 +16,6 @@ from rich.text import Text
 from textual import work
 from textual.binding import Binding
 
-import acd_tools
 import db
 from ui.formulario import Campo, Formulario
 from ui.modales import Confirmar
@@ -27,13 +25,20 @@ COLORES = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff"}
 ORDENES = [('nombre', "nombre"), ('ip', "IP"), ('categoria', "categoría")]
 
 
+def texto_abierto(e):
+    """'2026-10-21 10:04 · jdiaz' o '' si nunca se abrió desde Eliza."""
+    if not e.get('ultimo_abierto'):
+        return ""
+    return f"{e['ultimo_abierto'].replace('T', ' ')[:16]} · {e.get('ultimo_usuario') or '?'}"
+
+
 def orden_natural(texto):
     return [(0, int(p), '') if p.isdigit() else (1, 0, p) for p in re.split(r'(\d+)', str(texto or '').lower())]
 
 
 class PantallaEditor(PantallaTabla):
-    COLUMNAS = [('cat', "CAT", 6), ('nombre', "NOMBRE", 26), ('ip', "IP", 16), ('info', "INFO", 34),
-                ('comentario', "COMENTARIO", 30), ('accion', "ACCIÓN", None)]
+    COLUMNAS = [('cat', "CAT", 6), ('nombre', "NOMBRE", 26), ('ip', "IP", 16), ('comentario', "COMENTARIO", 34),
+                ('abierto', "ÚLTIMA VEZ ABIERTO", 30), ('accion', "ACCIÓN", None)]
     ACCION_ENTER = "editar"
     BINDINGS = PantallaTabla.BINDINGS + [
         Binding("enter", "editar", "Editar"),
@@ -42,7 +47,6 @@ class PantallaEditor(PantallaTabla):
         Binding("delete", "borrar", "Borrar", key_display="Supr"),
         Binding("c", "categoria", "Categoría"),
         Binding("o", "orden", "Orden"),
-        Binding("r", "reescanear", "Reescanear ACD"),
     ]
 
     def __init__(self, bd, categoria=None):
@@ -69,7 +73,7 @@ class PantallaEditor(PantallaTabla):
         lista.sort(key=lambda e: (orden_natural(e[campo]), orden_natural(e['nombre'])))
         for e in lista:
             yield e['id'], [Text(e['categoria'].upper(), style=f"bold {COLORES.get(e['categoria'], '#ffffff')}"),
-                            e['nombre'], e['ip'], e['info'], e['comentario'], e['accion']]
+                            e['nombre'], e['ip'], e['comentario'], texto_abierto(e), e['accion']]
 
     def al_refrescar(self):
         cat = self.categoria.upper() if self.categoria else "TODAS"
@@ -90,8 +94,7 @@ class PantallaEditor(PantallaTabla):
              Campo('nombre', "Nombre", e.get('nombre', ''), obligatorio=True),
              Campo('ip', "IP", e.get('ip', '')),
              Campo('accion', "Acción", e.get('accion', ''), ayuda='vnc <ip>  ·  open "C:\\ruta\\programa.exe"'),
-             Campo('info', "Info", e.get('info', '')),
-             Campo('comentario', "Comentario", e.get('comentario', ''))])
+             Campo('comentario', "Comentario", e.get('comentario', ''), ayuda="qué equipo es, ej. Estación del Robot")])
 
     @work(exclusive=True, group="editor", exit_on_error=False)
     async def action_editar(self):
@@ -145,29 +148,3 @@ class PantallaEditor(PantallaTabla):
     def action_orden(self):
         self.orden = (self.orden + 1) % len(ORDENES)
         self.refrescar()
-
-    def action_reescanear(self):
-        acd = [e for e in self.entradas.values() if e['categoria'] == 'acd']
-        if not acd:
-            self.estado("No hay entradas ACD.")
-            return
-        actualizados, errores = 0, []
-        for e in acd:
-            ruta = acd_tools.resolver_ruta_action(e['accion'], self.bd.carpeta)
-            info, error = acd_tools.reescanear(ruta, e['ip'])
-            if error:
-                errores.append(e['nombre'])
-                continue
-            if info != e['info']:
-                self.bd.guardar_entrada({**e, 'info': info}, e['id'])
-                actualizados += 1
-        self.hubo_cambios = self.hubo_cambios or bool(actualizados)
-        self.cargar()
-        self.refrescar()
-        texto = f"Reescaneo: {actualizados} fecha(s) actualizada(s) de {len(acd)}."
-        if errores:
-            texto += f" Sin archivo: {', '.join(errores[:8])}{'…' if len(errores) > 8 else ''}"
-        self.estado(texto, error=bool(errores))
-
-    def action_cerrar(self):
-        self.dismiss(self.hubo_cambios)

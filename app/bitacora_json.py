@@ -174,9 +174,10 @@ def rescatar_de_db(bd, base):
     """
     if bd.config_get('bitacora_en_json'):
         return 0
-    pasados = 0
     with bd.conexion() as con:
-        filas = [dict(f) for f in con.execute("SELECT * FROM bitacora ORDER BY fecha, hora, id")]
+        existe = con.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='bitacora'").fetchone()[0]
+        filas = [dict(f) for f in con.execute("SELECT * FROM bitacora ORDER BY fecha, hora, id")] if existe else []
+    pasados = 0
     for fila in filas:
         if fila.get('equipo') == 'V2':
             continue
@@ -184,7 +185,8 @@ def rescatar_de_db(bd, base):
         if registro not in [normalizar(r) for r in cargar_dia(base, registro['fecha'])]:
             agregar(base, registro)
             pasados += 1
-    with bd.conexion(escritura=True) as con:
-        con.execute("DELETE FROM bitacora")
+    if existe:
+        with bd.conexion(escritura=True) as con:
+            con.execute("DELETE FROM bitacora")
     bd.config_set('bitacora_en_json', True)
     return pasados

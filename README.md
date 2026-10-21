@@ -27,6 +27,21 @@ carpeta de datos.
 Recomendado: **Windows Terminal** (en Windows 11 viene por defecto). La
 consola clásica también funciona.
 
+## Cambio de formato de la base (esquema 2, oct-2026)
+
+La tabla de entradas dejó de usar `info` y `extra` (`info` se unió al
+comentario) y ahora guarda **cuándo y quién** abrió cada entrada por última
+vez. Una `eliza.db` anterior se convierte **una sola vez** con
+[`herramientas/migrar_eliza_db.py`](herramientas/migrar_eliza_db.py), que no
+depende de Eliza:
+
+1. Cierra Eliza en **todas** las PCs.
+2. `python migrar_eliza_db.py "S:\...\carpeta de datos" --simular` (revisa el reporte).
+3. `python migrar_eliza_db.py "S:\...\carpeta de datos"` y escribe `MIGRAR`.
+   Hace respaldo (`eliza.db.respaldo-...`), verifica renglón por renglón y
+   restaura el respaldo si algo no cuadra.
+4. Abre Eliza (se actualiza sola al arrancar o con `/update`).
+
 ## Uso
 
 Todo con teclado, desde la línea `ELIZA>`:
@@ -45,7 +60,7 @@ Todo con teclado, desde la línea `ELIZA>`:
 |---|---|
 | `/bitacora` | captura un registro (formulario; fecha y hora automáticas) |
 | `/bitacora hoy` · `ayer` · `DD` · `MM/DD` · `YYYY-MM-DD` | visor del día: ←/→ cambia de día, n nuevo, Enter editar, Supr borrar, y copiar a Excel, x exportar .tsv |
-| `/edit [vnc\|apps\|acd]` | editor de la base: Enter editar, n nueva, Supr borrar, c categoría, o orden, r reescanear ACD |
+| `/edit [vnc\|apps\|acd]` | editor de la base: Enter editar, n nueva, Supr borrar, c categoría, o orden; muestra cuándo y quién abrió cada entrada por última vez |
 | `/add` | agregar VNC/APPS eligiendo un .vnc/.lnk/.exe en un explorador de consola |
 | `/scan_acd [carpeta]` | buscar ACD/L5K y registrarlos (Enter), a abrir, u ubicación |
 | `/logix [ip\|nombre]` | **Monitor de variables** Allen-Bradley (ver abajo) |

@@ -35,8 +35,7 @@ async def alta(app, bd, inicio=None):
         es_vnc = datos['categoria'] == 'VNC'
         campos = [Campo('nombre', "Nombre", datos['nombre_sugerido'], obligatorio=True),
                   Campo('ip', "IP", datos['ip'], obligatorio=es_vnc),
-                  Campo('info', "Info", ""),
-                  Campo('comentario', "Comentario", "")]
+                  Campo('comentario', "Comentario", "", ayuda="qué equipo es, ej. Estación del Robot")]
         if not es_vnc:
             campos.insert(1, Campo('accion', "Acción", datos['action']))
             campos = [c for c in campos if c.clave != 'ip']
@@ -46,7 +45,7 @@ async def alta(app, bd, inicio=None):
             accion = f"vnc {resultado['ip']}" if es_vnc else resultado['accion']
             try:
                 bd.guardar_entrada({'categoria': datos['categoria'].lower(), 'nombre': resultado['nombre'],
-                                    'accion': accion, 'info': resultado['info'],
+                                    'accion': accion,
                                     'ip': resultado.get('ip', ''), 'comentario': resultado['comentario']})
                 agregadas += 1
                 app.ok(f"Agregado '{resultado['nombre']}' a {datos['categoria']}")

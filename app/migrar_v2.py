@@ -13,7 +13,8 @@ elegida tiene datos de V2 y todavía no tiene eliza.db.
 
 Qué migra (los archivos de V2 NO se modifican):
   config_json/*.json   -> tabla entradas (categoría = nombre del archivo)
-                          name/action/info/ip/comentario; otras claves -> extra
+                          name/action/ip/comentario; 'info' se une a comentario
+                          (en ACD se descarta: era 'IP | fecha'); otras claves se descartan
   bitacora/*.json      -> NO se migra: V3 usa los mismos archivos JSON (mismo formato)
   eliza_config.json    -> tabla config (vnc_password, vnc_puerto, ...)
   _acd_store/          -> se queda donde está: las entradas ACD conservan su ruta
@@ -37,6 +38,16 @@ from datetime import datetime
 import db
 
 CLAVES_ENTRADA = {'name': 'nombre', 'action': 'accion', 'info': 'info', 'ip': 'ip', 'comentario': 'comentario'}
+
+
+def unir_comentario(categoria, comentario, info):
+    """Misma regla que herramientas/migrar_eliza_db.py."""
+    comentario, info = (comentario or '').strip(), (info or '').strip()
+    if categoria == 'acd' or not info:
+        return comentario
+    if not comentario or comentario.lower() == info.lower():
+        return comentario or info
+    return f"{comentario} · {info}"
 CONFIG_OBSOLETA = ('carpeta_destino_acd',)
 
 
@@ -95,16 +106,18 @@ def leer_v2(origen, reporte, omitir_danados=False):
             continue
         usados = {}
         sin_nombre = 0
+        descartadas = set()
         for item in datos:
             if not isinstance(item, dict) or not str(item.get('name', '')).strip():
                 sin_nombre += 1
                 continue
-            entrada = {'categoria': categoria, 'extra': {}}
+            entrada = {'categoria': categoria}
             for clave, valor in item.items():
                 if clave in CLAVES_ENTRADA:
                     entrada[CLAVES_ENTRADA[clave]] = str(valor if valor is not None else '').strip()
                 else:
-                    entrada['extra'][clave] = valor
+                    descartadas.add(clave)
+            entrada['comentario'] = unir_comentario(categoria, entrada.get('comentario'), entrada.pop('info', ''))
             base = entrada['nombre']
             n = usados.get(base.lower(), 0) + 1
             usados[base.lower()] = n
@@ -112,6 +125,8 @@ def leer_v2(origen, reporte, omitir_danados=False):
                 entrada['nombre'] = f"{base} ({n})"
                 reporte.aviso(f"{categoria.upper()}: nombre repetido '{base}' -> '{entrada['nombre']}'")
             entradas.append(entrada)
+        if descartadas:
+            reporte.aviso(f"config_json/{archivo}: campos sin uso en V3, no se migran: {', '.join(sorted(descartadas))}")
         if sin_nombre:
             reporte.aviso(f"config_json/{archivo}: {sin_nombre} entrada(s) sin 'name' se omitieron.")
         reporte.info(f"{categoria.upper():<6} {sum(1 for e in entradas if e['categoria'] == categoria):>5} entradas")
@@ -138,6 +153,19 @@ def leer_v2(origen, reporte, omitir_danados=False):
     return {'entradas': entradas, 'bitacora': bitacora, 'config': config}
 
 
+def _contar_entradas(ruta):
+    """Cuántas entradas tiene una base existente (de cualquier versión del esquema)."""
+    import sqlite3
+    try:
+        con = sqlite3.connect(ruta)
+        try:
+            return con.execute("SELECT COUNT(*) FROM entradas").fetchone()[0]
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return 0
+
+
 def migrar(origen, destino=None, simular=False, reemplazar=False, omitir_danados=False):
     """Devuelve el Reporte. Lanza ErrorMigracion si no se puede (sin dejar nada a medias)."""
     destino = destino or origen
@@ -150,12 +178,11 @@ def migrar(origen, destino=None, simular=False, reemplazar=False, omitir_danados
     datos = leer_v2(origen, reporte, omitir_danados)
 
     if db.existe(destino):
-        conteos = db.BaseDatos(destino).inicializar().conteos()
-        if conteos['entradas'] or conteos['bitacora']:
+        conteos = _contar_entradas(db.ruta_db(destino))
+        if conteos:
             if not reemplazar:
                 raise ErrorMigracion(
-                    f"Ya existe una base con datos en {db.ruta_db(destino)} "
-                    f"({conteos['entradas']} entradas, {conteos['bitacora']} registros de bitácora). "
+                    f"Ya existe una base con datos en {db.ruta_db(destino)} ({conteos} entradas). "
                     "La migración es de un solo uso; usa 'reemplazar' solo si quieres empezar de nuevo.")
             if not simular:
                 respaldo = db.ruta_db(destino) + f".respaldo-{datetime.now():%Y%m%d-%H%M%S}"
@@ -176,14 +203,10 @@ def migrar(origen, destino=None, simular=False, reemplazar=False, omitir_danados
             ahora = db.ahora()
             for e in datos['entradas']:
                 con.execute(
-                    "INSERT INTO entradas (categoria, nombre, accion, info, ip, comentario, extra, creado, modificado)"
-                    " VALUES (?,?,?,?,?,?,?,?,?)",
-                    (e['categoria'], e['nombre'], e.get('accion', ''), e.get('info', ''), e.get('ip', ''),
-                     e.get('comentario', ''), json.dumps(e['extra'], ensure_ascii=False), ahora, ahora))
-            for r in datos['bitacora']:
-                campos = list(r)
-                con.execute(f"INSERT INTO bitacora ({', '.join(campos)}, creado) "
-                            f"VALUES ({', '.join('?' * len(campos))}, ?)", (*[r[c] for c in campos], ahora))
+                    "INSERT INTO entradas (categoria, nombre, accion, ip, comentario, creado, modificado)"
+                    " VALUES (?,?,?,?,?,?,?)",
+                    (e['categoria'], e['nombre'], e.get('accion', ''), e.get('ip', ''),
+                     e.get('comentario', ''), ahora, ahora))
             for clave, valor in datos['config'].items():
                 con.execute("INSERT INTO config (clave, valor) VALUES (?, ?)",
                             (clave, json.dumps(valor, ensure_ascii=False)))
@@ -192,10 +215,9 @@ def migrar(origen, destino=None, simular=False, reemplazar=False, omitir_danados
                         (json.dumps({'origen': origen, 'fecha': ahora}, ensure_ascii=False),))
 
         conteos = bd.conteos()
-        esperado = (len(datos['entradas']), len(datos['bitacora']))
-        if (conteos['entradas'], conteos['bitacora']) != esperado:
-            raise ErrorMigracion(f"Verificación fallida: se esperaban {esperado} y la base tiene "
-                                 f"{(conteos['entradas'], conteos['bitacora'])}. No se instaló la base.")
+        if conteos['entradas'] != len(datos['entradas']):
+            raise ErrorMigracion(f"Verificación fallida: se esperaban {len(datos['entradas'])} entradas y la base "
+                                 f"tiene {conteos['entradas']}. No se instaló la base.")
         os.replace(bd.ruta, db.ruta_db(destino))
     finally:
         shutil.rmtree(temporal_dir, ignore_errors=True)

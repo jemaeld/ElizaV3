@@ -7,7 +7,7 @@ config_json/*.json y eliza_config.json.
 
 La BITÁCORA NO vive aquí: sigue en bitacora/YYYY-MM-DD.json con el formato
 exacto de V2 (ver bitacora_json.py), porque otros programas usan esos
-archivos. La tabla 'bitacora' quedó solo por compatibilidad y está vacía.
+archivos.
 
 Pensado para una carpeta de RED compartida por varios equipos:
 - journal_mode=DELETE (WAL no es seguro sobre SMB/carpetas de red).
@@ -19,9 +19,12 @@ Pensado para una carpeta de RED compartida por varios equipos:
 Los proyectos ACD NO van dentro de la base: siguen siendo archivos en
 _acd_store/ (la base guarda la ruta, igual que V2).
 
+Esquema 2 (oct-2026): entradas sin 'info' ni 'extra' (info se unió a
+comentario) y con ultimo_abierto / ultimo_usuario. Una base del esquema 1 se
+convierte UNA vez con herramientas/migrar_eliza_db.py; Eliza no la abre.
+
 Tablas:
     entradas  (VNC, APPS, ACD y cualquier categoría futura)
-    bitacora  (sin uso: la bitácora está en JSON)
     config    (clave -> valor JSON)
     logix_registros (conjuntos de tags guardados del monitor)
 """
@@ -34,41 +37,24 @@ from contextlib import contextmanager
 from datetime import datetime
 
 NOMBRE_DB = "eliza.db"
-VERSION_ESQUEMA = 1
+VERSION_ESQUEMA = 2
+HERRAMIENTA_MIGRACION = r"herramientas\migrar_eliza_db.py"
 REINTENTOS = 5
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS entradas (
-    id          INTEGER PRIMARY KEY,
-    categoria   TEXT NOT NULL,                 -- 'vnc', 'apps', 'acd', ...
-    nombre      TEXT NOT NULL,
-    accion      TEXT NOT NULL DEFAULT '',      -- 'vnc <ip>' / 'open "<ruta>"'
-    info        TEXT NOT NULL DEFAULT '',
-    ip          TEXT NOT NULL DEFAULT '',
-    comentario  TEXT NOT NULL DEFAULT '',
-    extra       TEXT NOT NULL DEFAULT '{}',    -- campos adicionales (JSON)
-    creado      TEXT NOT NULL,
-    modificado  TEXT NOT NULL
+    id              INTEGER PRIMARY KEY,
+    categoria       TEXT NOT NULL,             -- 'vnc', 'apps', 'acd', ...
+    nombre          TEXT NOT NULL,
+    accion          TEXT NOT NULL DEFAULT '',  -- 'vnc <ip>' / 'open "<ruta>"'
+    ip              TEXT NOT NULL DEFAULT '',
+    comentario      TEXT NOT NULL DEFAULT '',  -- qué equipo es (ej. "Estación del Robot")
+    creado          TEXT NOT NULL,
+    modificado      TEXT NOT NULL,             -- solo cambia al EDITAR la entrada
+    ultimo_abierto  TEXT NOT NULL DEFAULT '',  -- última vez que se abrió desde Eliza
+    ultimo_usuario  TEXT NOT NULL DEFAULT ''   -- usuario de Windows que la abrió
 );
 CREATE UNIQUE INDEX IF NOT EXISTS entradas_unicas ON entradas(categoria, nombre COLLATE NOCASE);
-
-CREATE TABLE IF NOT EXISTS bitacora (
-    id          INTEGER PRIMARY KEY,
-    fecha       TEXT NOT NULL,                 -- YYYY-MM-DD
-    hora        TEXT NOT NULL,                 -- HH:MM:SS
-    linea       TEXT NOT NULL DEFAULT '',
-    estacion    TEXT NOT NULL DEFAULT '',
-    prefijo     TEXT NOT NULL DEFAULT '',
-    auditor     TEXT NOT NULL DEFAULT '',
-    tiempo      TEXT NOT NULL DEFAULT '',
-    falla       TEXT NOT NULL DEFAULT '',
-    ajuste      TEXT NOT NULL DEFAULT '',
-    comentarios TEXT NOT NULL DEFAULT '',
-    equipo      TEXT NOT NULL DEFAULT '',      -- PC que capturó
-    usuario     TEXT NOT NULL DEFAULT '',
-    creado      TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS bitacora_fecha ON bitacora(fecha, hora);
 
 CREATE TABLE IF NOT EXISTS config (
     clave TEXT PRIMARY KEY,
@@ -83,9 +69,7 @@ CREATE TABLE IF NOT EXISTS logix_registros (
 );
 """
 
-CAMPOS_ENTRADA = ('categoria', 'nombre', 'accion', 'info', 'ip', 'comentario')
-CAMPOS_BITACORA = ('fecha', 'hora', 'linea', 'estacion', 'prefijo', 'auditor', 'tiempo',
-                   'falla', 'ajuste', 'comentarios', 'equipo', 'usuario')
+CAMPOS_ENTRADA = ('categoria', 'nombre', 'accion', 'ip', 'comentario')
 
 
 class ErrorDB(Exception):
@@ -160,16 +144,20 @@ class BaseDatos:
         """Crea el archivo y las tablas si no existen (idempotente)."""
         os.makedirs(self.carpeta, exist_ok=True)
         with self.conexion(escritura=True) as con:
+            version = con.execute("PRAGMA user_version").fetchone()[0]
+            hay_tablas = con.execute("SELECT COUNT(*) FROM sqlite_master WHERE name='entradas'").fetchone()[0]
+            if version > VERSION_ESQUEMA:
+                raise ErrorDB("La base de datos es de una versión más nueva de Eliza. Actualiza con /update.")
+            if hay_tablas and version < VERSION_ESQUEMA:
+                raise ErrorDB(f"La base de datos tiene el formato anterior (versión {version}). Cierra Eliza "
+                              f"en todas las PCs y conviértela una vez con {HERRAMIENTA_MIGRACION} (está en el repositorio de "
+                              f"Eliza en GitHub).")
             # Sentencia por sentencia: executescript() haría commit por su cuenta
             # y rompería la transacción.
             for sentencia in ESQUEMA.split(';'):
                 if sentencia.strip():
                     con.execute(sentencia)
-            version = con.execute("PRAGMA user_version").fetchone()[0]
-            if version == 0:
-                con.execute(f"PRAGMA user_version={VERSION_ESQUEMA}")
-            elif version > VERSION_ESQUEMA:
-                raise ErrorDB("La base de datos es de una versión más nueva de Eliza. Actualiza con /update.")
+            con.execute(f"PRAGMA user_version={VERSION_ESQUEMA}")
         return self
 
     # ---------------------------------------------------------
@@ -189,31 +177,35 @@ class BaseDatos:
             return {f['categoria']: f['n'] for f in filas}
 
     def guardar_entrada(self, datos, id_entrada=None):
-        """Crea (id_entrada=None) o actualiza una entrada. Devuelve el id."""
+        """Crea (id_entrada=None) o actualiza una entrada. Devuelve el id.
+        Al actualizar no se tocan creado / ultimo_abierto / ultimo_usuario."""
         valores = {c: str(datos.get(c, '') or '').strip() for c in CAMPOS_ENTRADA}
         valores['categoria'] = valores['categoria'].lower()
         if not valores['categoria'] or not valores['nombre']:
             raise ErrorDB("La entrada necesita categoría y nombre.")
-        extra = json.dumps(datos.get('extra') or {}, ensure_ascii=False)
         try:
             with self.conexion(escritura=True) as con:
                 if id_entrada is None:
                     cur = con.execute(
-                        "INSERT INTO entradas (categoria, nombre, accion, info, ip, comentario, extra, creado, modificado)"
-                        " VALUES (?,?,?,?,?,?,?,?,?)",
-                        (*[valores[c] for c in CAMPOS_ENTRADA], extra, ahora(), ahora()))
+                        "INSERT INTO entradas (categoria, nombre, accion, ip, comentario, creado, modificado)"
+                        " VALUES (?,?,?,?,?,?,?)",
+                        (*[valores[c] for c in CAMPOS_ENTRADA], ahora(), ahora()))
                     return cur.lastrowid
-                if 'extra' not in datos:  # sin 'extra' se conservan los campos adicionales guardados
-                    fila = con.execute("SELECT extra FROM entradas WHERE id=?", (id_entrada,)).fetchone()
-                    extra = fila[0] if fila else extra
                 con.execute(
-                    "UPDATE entradas SET categoria=?, nombre=?, accion=?, info=?, ip=?, comentario=?, extra=?,"
-                    " modificado=? WHERE id=?",
-                    (*[valores[c] for c in CAMPOS_ENTRADA], extra, ahora(), id_entrada))
+                    "UPDATE entradas SET categoria=?, nombre=?, accion=?, ip=?, comentario=?, modificado=? WHERE id=?",
+                    (*[valores[c] for c in CAMPOS_ENTRADA], ahora(), id_entrada))
                 return id_entrada
         except sqlite3.IntegrityError as e:
             raise NombreRepetido(
                 f"Ya existe una entrada '{valores['nombre']}' en {valores['categoria'].upper()}.") from e
+
+    def registrar_apertura(self, id_entrada, usuario):
+        """Guarda cuándo y quién abrió la entrada. No cambia 'modificado'. Devuelve la fecha."""
+        momento = ahora()
+        with self.conexion(escritura=True) as con:
+            con.execute("UPDATE entradas SET ultimo_abierto=?, ultimo_usuario=? WHERE id=?",
+                        (momento, usuario, id_entrada))
+        return momento
 
     def borrar_entrada(self, id_entrada):
         with self.conexion(escritura=True) as con:
@@ -224,37 +216,6 @@ class BaseDatos:
             fila = con.execute("SELECT * FROM entradas WHERE categoria=? AND nombre=? COLLATE NOCASE",
                                (categoria.lower(), nombre.strip())).fetchone()
             return _fila_a_dict(fila) if fila else None
-
-    # ---------------------------------------------------------
-    # Bitácora
-    def agregar_bitacora(self, registro):
-        valores = {c: str(registro.get(c, '') or '') for c in CAMPOS_BITACORA}
-        if not valores['fecha'] or not valores['hora']:
-            raise ErrorDB("El registro de bitácora necesita fecha y hora.")
-        with self.conexion(escritura=True) as con:
-            cur = con.execute(
-                f"INSERT INTO bitacora ({', '.join(CAMPOS_BITACORA)}, creado) VALUES ({', '.join('?' * len(CAMPOS_BITACORA))}, ?)",
-                (*[valores[c] for c in CAMPOS_BITACORA], ahora()))
-            return cur.lastrowid
-
-    def bitacora_dia(self, fecha):
-        with self.conexion() as con:
-            return [dict(f) for f in con.execute("SELECT * FROM bitacora WHERE fecha=? ORDER BY hora, id", (fecha,))]
-
-    def bitacora_fechas(self, limite=60):
-        with self.conexion() as con:
-            return [f[0] for f in con.execute(
-                "SELECT DISTINCT fecha FROM bitacora ORDER BY fecha DESC LIMIT ?", (limite,))]
-
-    def actualizar_bitacora(self, id_registro, registro):
-        campos = [c for c in CAMPOS_BITACORA if c in registro]
-        with self.conexion(escritura=True) as con:
-            con.execute(f"UPDATE bitacora SET {', '.join(c + '=?' for c in campos)} WHERE id=?",
-                        (*[str(registro[c] or '') for c in campos], id_registro))
-
-    def borrar_bitacora(self, id_registro):
-        with self.conexion(escritura=True) as con:
-            con.execute("DELETE FROM bitacora WHERE id=?", (id_registro,))
 
     # ---------------------------------------------------------
     # Config
@@ -295,15 +256,9 @@ class BaseDatos:
         with self.conexion() as con:
             return {
                 'entradas': con.execute("SELECT COUNT(*) FROM entradas").fetchone()[0],
-                'bitacora': con.execute("SELECT COUNT(*) FROM bitacora").fetchone()[0],
                 'config': con.execute("SELECT COUNT(*) FROM config").fetchone()[0],
             }
 
 
 def _fila_a_dict(fila):
-    d = dict(fila)
-    try:
-        d['extra'] = json.loads(d.get('extra') or '{}')
-    except json.JSONDecodeError:
-        d['extra'] = {}
-    return d
+    return dict(fila)

@@ -52,6 +52,11 @@ CATEGORIAS_CON_IP = ('vnc', 'acd')
 CODIGO_REINICIAR = 10
 
 
+def texto_fecha(e):
+    """Para la búsqueda rápida cuando la entrada no tiene comentario."""
+    return f"modificado {str(e.get('modificado', '')).replace('T', ' ')[:16]}"
+
+
 def orden_natural(texto):
     return [(0, int(p), '') if p.isdigit() else (1, 0, p) for p in re.split(r'(\d+)', str(texto).lower())]
 
@@ -329,11 +334,11 @@ class ElizaApp(App):
             return
         palabras = texto.lower().split()
         for e in self.entradas:
-            pajar = f"{e['categoria']} {e['nombre']} {e['ip']} {e['comentario']} {e['info']}".lower()
+            pajar = f"{e['categoria']} {e['nombre']} {e['ip']} {e['comentario']}".lower()
             if all(p in pajar for p in palabras):
                 color = COLOR_CATEGORIA.get(e['categoria'], "#ffffff")
                 tabla.add_row(Text(e['categoria'].upper(), style=f"bold {color}"), e['nombre'], e['ip'],
-                              e['comentario'] or e['info'])
+                              e['comentario'] or Text(texto_fecha(e), style="#808080"))
                 self.filas_visibles.append(('entrada', e))
         if texto and not self.filas_visibles:
             self.filas_visibles = []
@@ -415,6 +420,18 @@ class ElizaApp(App):
         (self.ok if exito else self.aviso)(mensaje)
         if exito:
             self.query_one("#linea", Input).value = ""
+            self.registrar_apertura(fila[1])
+
+    @work(thread=True, exit_on_error=False, group="apertura")
+    def registrar_apertura(self, entrada):
+        """Guarda cuándo y quién abrió la entrada. En segundo plano: si la base
+        en red tarda o falla, la entrada ya se abrió y Eliza no se congela."""
+        usuario = getpass.getuser()
+        try:
+            entrada['ultimo_abierto'] = self.bd.registrar_apertura(entrada['id'], usuario)
+            entrada['ultimo_usuario'] = usuario
+        except Exception as e:  # noqa: BLE001 - solo es un registro
+            self.call_from_thread(self.aviso, f"No se pudo registrar la apertura en la base: {e}")
 
     # ---------------------------------------------------------
     # Comandos

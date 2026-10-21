@@ -35,12 +35,14 @@ vez. Una `eliza.db` anterior se convierte **una sola vez** con
 [`herramientas/migrar_eliza_db.py`](herramientas/migrar_eliza_db.py), que no
 depende de Eliza:
 
-1. Cierra Eliza en **todas** las PCs.
-2. `python migrar_eliza_db.py "S:\...\carpeta de datos" --simular` (revisa el reporte).
+1. En cada PC, `/update` en Eliza. Al reiniciar, Eliza avisa que la base
+   tiene el formato anterior y se cierra: es lo esperado.
+2. Con Eliza cerrada en **todas** las PCs:
+   `python migrar_eliza_db.py "S:\...\carpeta de datos" --simular` (revisa el reporte).
 3. `python migrar_eliza_db.py "S:\...\carpeta de datos"` y escribe `MIGRAR`.
    Hace respaldo (`eliza.db.respaldo-...`), verifica renglón por renglón y
    restaura el respaldo si algo no cuadra.
-4. Abre Eliza (se actualiza sola al arrancar o con `/update`).
+4. Abre Eliza.
 
 ## Uso
 

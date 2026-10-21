@@ -2,7 +2,8 @@
 logix_tag.py -- asistente para agregar/editar un tag del Monitor de Variables.
 
     IP          [L31E125      ]          IP o NOMBRE: busca en los ACD de la base (nombre, IP,
-                L31E125 · Cargadora…     comentario); Enter / ↓ eligen y se usa su IP.
+                L31E125 · Cargadora…     comentario); Enter / ↓ eligen y se usa su IP;
+                                         Tab completa el nombre, → acepta la sugerencia en gris.
                                          Al confirmar la IP se leen programas y tags del PLC.
     Scope       [Principal (Controlador) ▼]   o Subprograma
     Programa    [Estacion30]             (solo subprograma)
@@ -80,6 +81,7 @@ class AsistenteTag(_Base):
         i = self.inicial
         caja = self.marco(
             Grid(Label("IP", classes="etiqueta"), Input(i['ip'], id="ip", placeholder="IP o nombre (ej. L31E125)",
+                                                       suggester=SugeridorLista(self._nombres_equipos),
                                                        select_on_focus=False),
                  Static(""), Static("", id="equipo", classes="equipo"),
                  Label("Scope", classes="etiqueta"),
@@ -115,6 +117,10 @@ class AsistenteTag(_Base):
 
     def _es_programa(self):
         return self.scope == PROGRAMA
+
+    def _nombres_equipos(self):
+        """Para la sugerencia en gris del campo IP: nombres de ACD en orden natural."""
+        return [e['nombre'] for e in logix_tools.buscar_equipos(self.equipos, '')]
 
     def _base_tags(self):
         return self.tags_programa if self._es_programa() else self.tags_controlador
@@ -200,6 +206,10 @@ class AsistenteTag(_Base):
 
     def on_key(self, evento):
         enfocado = self.focused
+        if evento.key == "tab" and getattr(enfocado, "id", None) == "ip" and self._completar_nombre():
+            evento.stop()
+            evento.prevent_default()
+            return
         if evento.key in ("down", "up") and isinstance(enfocado, (Input, Select)):
             if isinstance(enfocado, Select) and enfocado.expanded:
                 return
@@ -233,6 +243,20 @@ class AsistenteTag(_Base):
 
     # ---------------------------------------------------------
     # IP por nombre
+    def _completar_nombre(self):
+        """Tab en IP (igual que en el lanzador): pone el nombre de la primera
+        coincidencia de la lista. Si ya está completo (o es una IP), Tab avanza."""
+        campo = self.query_one("#ip", Input)
+        texto = campo.value.strip()
+        if not texto or logix_tools.es_ip(texto):
+            return False
+        hallados = logix_tools.buscar_equipos(self.equipos, texto)
+        if not hallados or hallados[0]['nombre'] == campo.value:
+            return False
+        campo.value = hallados[0]['nombre']
+        campo.cursor_position = len(campo.value)
+        return True
+
     def _resolver_nombre(self, primero=False):
         """Si en IP quedó un nombre (no una IP), lo cambia por la IP del ACD.
         Coincidencia exacta de nombre, o la única coincidencia; con primero=True

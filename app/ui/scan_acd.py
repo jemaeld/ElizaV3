@@ -1,6 +1,13 @@
 """
 scan_acd.py -- /scan_acd [carpeta]: busca proyectos ACD/L5K y los registra.
 
+Sin carpeta abre el explorador (igual que /add) mostrando carpetas y
+archivos .ACD/.L5K con su fecha:
+    Ctrl+S  buscar en la carpeta resaltada (y subcarpetas) -> tabla de abajo,
+            del más reciente al más viejo
+    Enter   sobre un archivo: registrarlo directo
+Recuerda la última carpeta usada en esta PC.
+
 Teclas en la tabla de resultados:
     Enter   registrar en la base (pide Línea, Estación e IP; la IP detectada ya viene)
     a       abrir el archivo           u   abrir su ubicación
@@ -18,8 +25,10 @@ from textual import work
 from textual.binding import Binding
 
 import acd_tools
+import rutas
+from ui.explorador import ExploradorArchivos
 from ui.formulario import Campo, Formulario
-from ui.modales import Confirmar, PedirCarpeta
+from ui.modales import Confirmar
 from ui.pantalla import PantallaTabla
 
 
@@ -37,7 +46,7 @@ class PantallaScanACD(PantallaTabla):
         Binding("a", "abrir", "Abrir archivo"),
         Binding("u", "ubicacion", "Abrir ubicación"),
         Binding("o", "orden", "Orden"),
-        Binding("s", "otra_carpeta", "Otra carpeta"),
+        Binding("s", "otra_carpeta", "Explorar"),
     ]
 
     def __init__(self, bd, carpeta=None):
@@ -67,14 +76,39 @@ class PantallaScanACD(PantallaTabla):
 
     @work(exclusive=True, group="scan", exit_on_error=False)
     async def action_otra_carpeta(self):
-        carpeta = await self.app.push_screen_wait(PedirCarpeta(
-            "Scan ACD", "Carpeta donde buscar proyectos .ACD / .L5K (incluye subcarpetas).", self.carpeta or ""))
-        if carpeta:
-            self.escanear(carpeta)
+        inicio = self.carpeta or rutas.leer_local().get('ultima_carpeta_acd') or None
+        eleccion = await self.app.push_screen_wait(ExploradorArchivos(
+            "Scan ACD: elige la carpeta (Ctrl+S) o el archivo (Enter)", acd_tools.VALID_EXTS, inicio,
+            mostrar_fechas=True, elegir_carpeta=True))
+        if not eleccion:
+            if not self.resultados:
+                self.estado("Sin carpeta. Presiona 's' para explorar.")
+            return
+        if isinstance(eleccion, dict):
+            self.escanear(eleccion['carpeta'])
+            return
+        # Un archivo: se muestra en la tabla y se registra directo.
+        self._recordar(os.path.dirname(eleccion))
+        info = acd_tools.analyze_file(eleccion)
+        if not info:
+            self.estado(f"No se pudo leer {eleccion}", error=True)
+            return
+        info['ip_detectada'] = acd_tools.find_ip_in_string(info['file']) or ""
+        self.carpeta = os.path.dirname(eleccion)
+        self.resultados = [info]
+        self.refrescar(conservar=False)
+        await self._registrar(info)
+
+    def _recordar(self, carpeta):
+        try:
+            rutas.guardar_local(ultima_carpeta_acd=carpeta)
+        except OSError:
+            pass
 
     @work(exclusive=True, group="scan", exit_on_error=False)
     async def escanear(self, carpeta):
         self.carpeta = carpeta
+        self._recordar(carpeta)
         self.estado("Buscando… (las carpetas de red pueden tardar)")
         self.resultados = await self.app.run_in_thread(acd_tools.buscar_archivos_acd, carpeta)
         self.refrescar(conservar=False)
@@ -108,8 +142,10 @@ class PantallaScanACD(PantallaTabla):
     @work(exclusive=True, group="scan", exit_on_error=False)
     async def action_registrar(self):
         r = self._actual()
-        if not r:
-            return
+        if r:
+            await self._registrar(r)
+
+    async def _registrar(self, r):
         datos = await self.app.push_screen_wait(Formulario(
             "Registrar proyecto ACD",
             [Campo('linea', "Línea", obligatorio=True), Campo('estacion', "Estación", obligatorio=True),

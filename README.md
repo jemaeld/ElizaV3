@@ -64,7 +64,7 @@ Todo con teclado, desde la línea `ELIZA>`:
 | `/bitacora hoy` · `ayer` · `DD` · `MM/DD` · `YYYY-MM-DD` | visor del día: ←/→ cambia de día, n nuevo, Enter editar, Supr borrar, y copiar a Excel, x exportar .tsv |
 | `/edit [vnc\|apps\|acd]` | editor de la base: Enter editar, n nueva, Supr borrar, c categoría, o orden; muestra cuándo y quién abrió cada entrada por última vez |
 | `/add` | agregar VNC/APPS eligiendo un .vnc/.lnk/.exe en un explorador de consola |
-| `/scan_acd [carpeta]` | buscar ACD/L5K y registrarlos (Enter), a abrir, u ubicación |
+| `/scan_acd [carpeta]` | explorador de carpetas con los .ACD/.L5K y su fecha (más reciente primero): Ctrl+S busca en la carpeta (y subcarpetas) y los enlista; Enter sobre un archivo lo registra directo. En la tabla: Enter registrar, a abrir, u ubicación, s explorar. Recuerda la última carpeta |
 | `/logix [ip\|nombre]` | **Monitor de variables** Allen-Bradley (ver abajo) |
 | `/ip` | la lista muestra los adaptadores con su IP; `/ip LAN 10.0.0.100 [255.255.0.0 \| /16]` IP fija (máscara 255.255.255.0 si no se indica, sin gateway) · `/ip LAN L31E125 [.249]` misma subred del PLC, terminación .250 por defecto · `/ip LAN dhcp`. Pide confirmar; si Windows lo exige, pide permiso de administrador solo para ese cambio |
 | `/ping` | la lista muestra VNC y ACD (filtra por nombre, IP o comentario); Enter hace ping en ventana aparte |

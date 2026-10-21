@@ -7,8 +7,8 @@ Screen {
 }
 
 #cabecera {
-    height: 7;
-    padding: 1 2 0 2;
+    height: 5;
+    padding: 0 2;
 }
 #logo {
     width: auto;
@@ -22,7 +22,8 @@ Screen {
 
 #resultados {
     height: 1fr;
-    margin: 1 1 0 1;
+    margin: 0 1;
+    border-title-color: #ffcc66;
     background: #0a0a0a;
     border: round #1f5f1f;
     scrollbar-color: #00aa00;
@@ -42,7 +43,7 @@ Screen {
 }
 
 #registro {
-    height: 7;
+    height: 5;    /* 3 líneas + borde */
     margin: 0 1;
     background: #050505;
     border: round #333333;

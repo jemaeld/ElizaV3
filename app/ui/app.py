@@ -33,10 +33,12 @@ from textual.containers import Horizontal
 from textual.widgets import DataTable, Footer, Input, RichLog, Static
 
 import acciones
+import ip_tools
 import bitacora_json
 import bitacora_tools
 import db
 import licencia
+import logix_tools
 import migrar_v2
 import network_tools
 import rutas
@@ -323,7 +325,12 @@ class ElizaApp(App):
     def filtrar(self, texto):
         tabla = self.query_one("#resultados", DataTable)
         tabla.clear()
+        tabla.border_title = ""
         self.filas_visibles = []
+        comando, espacio, argumento = texto.lstrip().partition(' ')
+        if espacio and comando.lower() in self.ARGUMENTOS:
+            getattr(self, self.ARGUMENTOS[comando.lower()])(tabla, argumento)
+            return
         texto = texto.strip()
         if texto.startswith('/'):
             palabra = texto.split(' ', 1)[0].lower()
@@ -343,6 +350,65 @@ class ElizaApp(App):
         if texto and not self.filas_visibles:
             self.filas_visibles = []
 
+    # ---------------------------------------------------------
+    # Lista contextual para los argumentos de /ip y /ping
+    ARGUMENTOS = {'/ip': '_filas_ip', '/ping': '_filas_ping'}
+
+    def _fila_completar(self, tabla, linea, celdas, dato=None):
+        tabla.add_row(*celdas)
+        self.filas_visibles.append(('completar', linea, dato))
+
+    def _equipos_acd(self):
+        return [e for e in self.entradas if e['categoria'] == 'acd']
+
+    def _filas_ip(self, tabla, argumento):
+        try:
+            self.adaptadores = ip_tools.adaptadores()
+        except Exception as e:  # noqa: BLE001
+            tabla.border_title = f"No se pudieron leer los adaptadores: {e}"
+            return
+        r = ip_tools.interpretar(argumento, self.adaptadores, self._equipos_acd())
+        if r['etapa'] == 'adaptador':
+            filtro = r['filtro'].lower()
+            for a in self.adaptadores:
+                if filtro in a['nombre'].lower():
+                    estado = Text("conectado", style="#00ff00") if a['activo'] else Text("desconectado", style="#808080")
+                    self._fila_completar(tabla, f"/ip {a['nombre']} ",
+                                         [Text("RED", style="bold #5f87ff"), a['nombre'],
+                                          a['ip'] or "—", Text.assemble(ip_tools.describir_adaptador(a), "  ", estado)])
+            tabla.border_title = "Adaptador: Tab completa · después: IP, nombre de PLC o dhcp"
+        elif r['etapa'] == 'destino':
+            a, filtro = r['adaptador'], r['filtro']
+            if 'dhcp'.startswith(filtro.lower()):
+                self._fila_completar(tabla, f"/ip {a['nombre']} dhcp",
+                                     [Text("DHCP", style="bold #5f87ff"), "dhcp", "", "Regresar a automático"])
+            if not ip_tools.es_ip(filtro.split()[0] if filtro else ''):
+                for e in logix_tools.buscar_equipos(self._equipos_acd(), filtro):
+                    self._fila_completar(tabla, f"/ip {a['nombre']} {e['nombre']} ",
+                                         [Text("PLC", style=f"bold {COLOR_CATEGORIA['acd']}"), e['nombre'], e['ip'],
+                                          e['comentario'] or ""])
+            tabla.border_title = (f"{a['nombre']} ({ip_tools.describir_adaptador(a)}) → IP · PLC [.terminación] "
+                                  f"[máscara] · dhcp")
+        elif r['etapa'] == 'plan':
+            ip = "automático" if r['modo'] == 'dhcp' else r['ip']
+            tabla.add_row(Text("CAMBIO", style="bold #ffcc00"), r['adaptador']['nombre'], ip, r['resumen'])
+            self.filas_visibles.append(('plan', r))
+            tabla.border_title = "Enter aplica el cambio (pide confirmar)"
+        else:
+            tabla.border_title = r['mensaje']
+
+    def _filas_ping(self, tabla, argumento):
+        palabras = argumento.lower().split()
+        for e in self.entradas:
+            if e['categoria'] not in CATEGORIAS_CON_IP or not acciones.ip_de_entrada(e):
+                continue
+            if all(p in f"{e['nombre']} {e['ip']} {e['comentario']}".lower() for p in palabras):
+                color = COLOR_CATEGORIA.get(e['categoria'], "#ffffff")
+                self._fila_completar(tabla, f"/ping {e['nombre']}",
+                                     [Text(e['categoria'].upper(), style=f"bold {color}"), e['nombre'],
+                                      acciones.ip_de_entrada(e), e['comentario'] or ""], e)
+        tabla.border_title = "Ping: escribe nombre, IP o comentario · Tab completa · Enter hace ping"
+
     def action_mover(self, paso):
         tabla = self.query_one("#resultados", DataTable)
         if tabla.row_count:
@@ -359,7 +425,12 @@ class ElizaApp(App):
         linea = self.query_one("#linea", Input)
         if fila is None:
             return
-        linea.value = (fila[1] + " ") if fila[0] == 'comando' else fila[1]['nombre']
+        if fila[0] == 'plan':
+            return
+        if fila[0] == 'completar':
+            linea.value = fila[1]
+        else:
+            linea.value = (fila[1] + " ") if fila[0] == 'comando' else fila[1]['nombre']
         linea.cursor_position = len(linea.value)
 
     def action_borrar_linea(self):
@@ -404,6 +475,9 @@ class ElizaApp(App):
                 else:
                     self.aviso(f"Comando no reconocido: {comando}. F1 para ayuda.")
                     return
+            if comando in self.ARGUMENTOS and arg.strip():
+                self._ejecutar_con_argumento(comando, arg.strip())
+                return
             self.query_one("#linea", Input).value = ""
             self.COMANDOS[comando][1](self, arg.strip())
             return
@@ -446,17 +520,52 @@ class ElizaApp(App):
             return (ip, None) if ip else (None, f"'{coincidencias[0]['nombre']}' no tiene IP registrada.")
         return argumento.strip(), None
 
+    def _ejecutar_con_argumento(self, comando, arg):
+        """Enter en '/ip …' o '/ping …': si lo escrito está completo se ejecuta;
+        si no, se completa con la fila resaltada (como Tab)."""
+        fila = self._seleccionada()
+        if comando == '/ip':
+            r = ip_tools.interpretar(arg, getattr(self, 'adaptadores', None) or ip_tools.adaptadores(),
+                                     self._equipos_acd())
+            if r['etapa'] == 'plan':
+                self.query_one("#linea", Input).value = ""
+                self.cambiar_ip(r)
+            elif r['etapa'] == 'error':
+                self.aviso(r['mensaje'])
+            elif fila and fila[0] == 'completar':
+                self.action_completar()
+            else:
+                self.aviso("Adaptador no encontrado. Escribe /ip y elige de la lista." if r['etapa'] == 'adaptador'
+                           else "Escribe una IP (10.0.0.100), un PLC de la lista o dhcp.")
+            return
+        # /ping
+        exacta = any(e['nombre'].lower() == arg.lower() for e in self.entradas if e['categoria'] in CATEGORIAS_CON_IP)
+        if not exacta and not ip_tools.es_ip(arg) and fila and fila[0] == 'completar' and fila[2]:
+            arg = fila[2]['nombre']
+        self.query_one("#linea", Input).value = ""
+        self.cmd_ping(arg)
+
     def cmd_ip(self, arg):
-        self.info("── Interfaces de red ──")
-        for detalle in network_tools.interfaces_ipv4():
-            self.info(f"  {detalle}")
+        linea = self.query_one("#linea", Input)
+        linea.value = "/ip "
+        linea.cursor_position = len(linea.value)
+
+    @work(exclusive=True, group="ip", exit_on_error=False)
+    async def cambiar_ip(self, plan):
+        if not await self.push_screen_wait(modales.Confirmar(
+                "Cambiar IP", plan['resumen'] + "\n\nWindows puede pedir permiso de administrador.",
+                si="Aplicar", no="Cancelar")):
+            self.info("Cambio de IP cancelado.")
+            return
+        self.info(f"Aplicando: {plan['resumen']} …")
+        ok, mensaje, uso_admin = await self.run_in_thread(ip_tools.aplicar, plan)
+        (self.ok if ok else self.aviso)(mensaje + (" (con permiso de administrador)" if ok and uso_admin else ""))
 
     def cmd_ping(self, arg):
-        if not arg:
-            fila = self._seleccionada()
-            arg = fila[1]['nombre'] if fila and fila[0] == 'entrada' else ""
-        if not arg:
-            self.aviso("Uso: /ping <ip o nombre>  (o selecciona una entrada y escribe /ping)")
+        if not arg:   # abre la lista de VNC/ACD para elegir
+            linea = self.query_one("#linea", Input)
+            linea.value = "/ping "
+            linea.cursor_position = len(linea.value)
             return
         ip, error = self.resolver_ip(arg)
         if error:
@@ -567,8 +676,8 @@ class ElizaApp(App):
         '/edit':     ("Editor de la base (opcional: vnc, apps, acd)", cmd_edit),
         '/add':      ("Agregar VNC/APPS desde un archivo .vnc, .lnk o .exe", cmd_add),
         '/scan_acd': ("Buscar proyectos ACD/L5K en una carpeta y registrarlos", cmd_scan_acd),
-        '/ip':       ("Interfaces de red de este equipo", cmd_ip),
-        '/ping':     ("Ping a una IP o entrada VNC/ACD (ventana aparte)", cmd_ping),
+        '/ip':       ("Ver/cambiar IP: /ip LAN 10.0.0.100 [máscara] · /ip LAN L31E125 [.249] · /ip LAN dhcp", cmd_ip),
+        '/ping':     ("Ping a una IP o entrada VNC/ACD (ventana aparte); la lista muestra VNC y ACD", cmd_ping),
         '/reload':   ("Vuelve a leer la base (si otro equipo la cambió)", cmd_reload),
         '/settings': ("Cambia la carpeta de datos (remota o local)", cmd_settings),
         '/update':   ("Busca y descarga la última versión desde GitHub", cmd_update),

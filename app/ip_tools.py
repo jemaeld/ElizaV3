@@ -2,8 +2,8 @@
 ip_tools.py -- /ip: ver y cambiar la IP de un adaptador de red.
 
     /ip                                 lista de adaptadores (en la tabla del lanzador)
-    /ip LAN 10.140.16.250               IP fija, máscara 255.255.255.0, sin gateway
-    /ip LAN 10.140.16.250 255.255.0.0   (o /16) con esa máscara
+    /ip LAN 10.0.0.100                  IP fija, máscara 255.255.255.0, sin gateway
+    /ip LAN 10.0.0.100    255.255.0.0   (o /16) con esa máscara
     /ip LAN L31E125                     misma subred del PLC, terminación .250
     /ip LAN L31E125 .249                misma subred del PLC, terminación .249
     /ip LAN dhcp                        regresa a automático

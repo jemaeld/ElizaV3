@@ -11,6 +11,7 @@ Incluye:
 """
 
 import json
+import re
 from datetime import datetime
 
 VERSION_REGISTRO = 1
@@ -163,6 +164,34 @@ def filtrar_nombres(nombres, texto, limite=500):
     empiezan = [n for n in nombres if n.lower().startswith(texto)]
     contienen = [n for n in nombres if texto in n.lower() and not n.lower().startswith(texto)]
     return (empiezan + contienen)[:limite]
+
+
+_PATRON_IP = re.compile(r'^\d{1,3}(\.\d{1,3}){3}$')
+
+
+def es_ip(texto):
+    return bool(_PATRON_IP.match((texto or '').strip()))
+
+
+def buscar_equipos(equipos, texto, limite=300):
+    """
+    Equipos (dicts con nombre, ip, comentario: las entradas ACD de la base)
+    que coinciden con 'texto'. Todas las palabras deben aparecer en
+    nombre / IP / comentario. Orden: nombre exacto, nombre que empieza
+    igual, el resto; dentro de cada grupo por nombre natural.
+    """
+    palabras = (texto or '').strip().lower().split()
+    def natural(t):
+        return [(0, int(p), '') if p.isdigit() else (1, 0, p) for p in re.split(r'(\d+)', t.lower())]
+    def grupo(e):
+        nombre = e['nombre'].lower()
+        if not palabras:
+            return 2
+        return 0 if nombre == ' '.join(palabras) else (1 if nombre.startswith(palabras[0]) else 2)
+    hallados = [e for e in equipos if e.get('ip')
+                and all(p in f"{e['nombre']} {e['ip']} {e.get('comentario', '')}".lower() for p in palabras)]
+    hallados.sort(key=lambda e: (grupo(e), natural(e['nombre'])))
+    return hallados[:limite]
 
 
 # ---------------------------------------------------------

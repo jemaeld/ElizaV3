@@ -4,7 +4,7 @@ logix.py -- /logix [ip|nombre]: MONITOR DE VARIABLES Allen-Bradley.
     CONEX | IP | POLL | TAG | VALOR | ESCRITURA | COMENTARIO
 
 Teclas:
-    a           agregar tag (asistente con programas/tags leídos del PLC)
+    a           agregar tag (asistente: IP o nombre del ACD, programas/tags leídos del PLC)
     Enter / w   escribir en la variable 1..N veces (ventana de escritura)
     e           editar el tag de la fila (asistente)
     Espacio     conectar / desconectar la fila
@@ -129,7 +129,7 @@ class PantallaLogix(PantallaTabla):
     async def action_agregar(self):
         actual = self._actual()
         ip = (actual or {}).get('ip') or self.ultima_ip
-        datos = await self.app.push_screen_wait(AsistenteTag(self.explorador, ip=ip))
+        datos = await self.app.push_screen_wait(AsistenteTag(self.explorador, ip=ip, equipos=await self._equipos()))
         if datos:
             self.ultima_ip = datos['ip']
             id_fila = self.monitor.agregar(datos['ip'], datos['tag'], datos['polling_ms'], datos['comentario'])
@@ -144,11 +144,20 @@ class PantallaLogix(PantallaTabla):
             return
         datos = await self.app.push_screen_wait(AsistenteTag(
             self.explorador, ip=f['ip'], tag=f['tag'], polling_ms=f['polling_ms'], comentario=f['comentario'],
-            editar=True))
+            editar=True, equipos=await self._equipos()))
         if datos:
             self.ultima_ip = datos['ip']
             self.monitor.actualizar(f['id'], **datos)
             self.refrescar()
+
+    async def _equipos(self):
+        """Entradas ACD de la base para elegir la IP por nombre. Si la base
+        no responde, el asistente funciona igual (IP a mano)."""
+        try:
+            return await self.app.run_in_thread(self.bd.entradas, 'acd')
+        except Exception as e:  # noqa: BLE001
+            self.estado(f"No se pudo leer la lista de ACD de la base: {e}", error=True)
+            return []
 
     def _ir_a(self, id_fila):
         try:

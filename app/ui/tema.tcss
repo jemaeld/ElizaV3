@@ -353,3 +353,7 @@ ModalScreen {
     background: #050505;
     border: round #333333;
 }
+.rejilla .equipo {
+    padding: 0 1;
+    color: #00ffff;
+}

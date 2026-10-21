@@ -1,7 +1,9 @@
 """
 logix_tag.py -- asistente para agregar/editar un tag del Monitor de Variables.
 
-    IP          [192.168.1.10]           (al confirmar la IP se leen programas y tags del PLC)
+    IP          [L31E125      ]          IP o NOMBRE: busca en los ACD de la base (nombre, IP,
+                L31E125 · Cargadora…     comentario); Enter / ↓ eligen y se usa su IP.
+                                         Al confirmar la IP se leen programas y tags del PLC.
     Scope       [Principal (Controlador) ▼]   o Subprograma
     Programa    [Estacion30]             (solo subprograma)
     Tag         [Timer_Soldadura.DN]
@@ -11,7 +13,7 @@ logix_tag.py -- asistente para agregar/editar un tag del Monitor de Variables.
     ┌ coincidencias ──────────┐  lista filtrada mientras escribes
     └─────────────────────────┘
 
-Teclado: Enter / ↓ / Tab avanzan; en Programa o Tag, ↓ entra a la lista de
+Teclado: Enter / ↓ / Tab avanzan; en IP, Programa o Tag, ↓ entra a la lista de
 coincidencias (Enter elige, Esc regresa al campo); → acepta la sugerencia en
 gris; Ctrl+S guarda; Esc cancela. Pegar una ruta completa (Program:X.Y) en
 Tag la reparte sola. Sin conexión al PLC todo se escribe a mano.
@@ -60,7 +62,7 @@ class AsistenteTag(_Base):
         Binding("ctrl+s", "guardar", show=False, priority=True),
     ]
 
-    def __init__(self, explorador, ip="", tag="", polling_ms=100, comentario="", editar=False):
+    def __init__(self, explorador, ip="", tag="", polling_ms=100, comentario="", editar=False, equipos=None):
         super().__init__("LOGIX :: " + ("editar tag" if editar else "agregar tag"),
                          "Enter siguiente · ↓ lista · → sugerencia · Ctrl+S guardar · Esc cancela")
         self.explorador = explorador
@@ -70,12 +72,16 @@ class AsistenteTag(_Base):
         self.tags_controlador, self.programas, self.tags_programa = [], [], []
         self.scope = self.inicial['scope']   # se guarda aquí: las sugerencias lo leen sin tocar la pantalla
         self.ip_consultada = None
-        self.campo_lista = None   # 'programa' o 'tag': a qué campo alimenta la lista
+        self.campo_lista = None   # 'ip', 'programa' o 'tag': a qué campo alimenta la lista
+        self.equipos = list(equipos or [])   # entradas ACD: {nombre, ip, comentario}
+        self.equipos_lista = []              # los que se muestran en la lista (campo IP)
 
     def compose(self) -> ComposeResult:
         i = self.inicial
         caja = self.marco(
-            Grid(Label("IP", classes="etiqueta"), Input(i['ip'], id="ip", placeholder="192.168.1.10"),
+            Grid(Label("IP", classes="etiqueta"), Input(i['ip'], id="ip", placeholder="IP o nombre (ej. L31E125)",
+                                                       select_on_focus=False),
+                 Static(""), Static("", id="equipo", classes="equipo"),
                  Label("Scope", classes="etiqueta"),
                  Select([("Principal (Controlador)", CONTROLADOR), ("Subprograma", PROGRAMA)],
                         value=i['scope'], allow_blank=False, id="scope"),
@@ -97,6 +103,7 @@ class AsistenteTag(_Base):
 
     def on_mount(self):
         self._aplicar_scope()
+        self._mostrar_equipo()
         self._actualizar_ruta()
         (self.query_one("#tag") if self.inicial['ip'] else self.query_one("#ip")).focus()
         self._consultar_plc()
@@ -134,6 +141,13 @@ class AsistenteTag(_Base):
     def _llenar_lista(self, campo):
         self.campo_lista = campo
         lista = self.query_one("#lista", OptionList)
+        if campo == 'ip':
+            texto = self.query_one("#ip", Input).value
+            self.equipos_lista = logix_tools.buscar_equipos(self.equipos, texto)
+            lista.clear_options()
+            for e in self.equipos_lista:
+                lista.add_option(Option(f"{e['nombre']:<16} {e['ip']:<16} {e.get('comentario', '')}"))
+            return
         if campo == 'programa':
             base, texto = self.programas, self.query_one("#programa", Input).value
         else:
@@ -151,6 +165,10 @@ class AsistenteTag(_Base):
 
     def on_input_changed(self, evento: Input.Changed):
         campo = evento.input.id
+        if campo == "ip":
+            self._llenar_lista('ip')
+            self._mostrar_equipo()
+            return
         if campo == "tag":
             programa, nombre = logix_tools.separar_ruta(evento.value)
             if programa:  # se pegó una ruta completa: se reparte en los campos
@@ -167,14 +185,17 @@ class AsistenteTag(_Base):
 
     def on_descendant_focus(self, evento):
         widget = evento.widget
-        if getattr(widget, "id", None) in ("tag", "programa"):
+        if getattr(widget, "id", None) in ("ip", "tag", "programa"):
             self._llenar_lista(widget.id)
-        if getattr(widget, "id", None) != "ip":
+        if getattr(widget, "id", None) not in ("ip", "lista"):
+            self._resolver_nombre()
             self._consultar_plc()
         if getattr(widget, "id", None) == "tag" and self._es_programa():
             self._pedir_programa()
 
     def on_input_submitted(self, evento: Input.Submitted):
+        if evento.input.id == "ip":
+            self._resolver_nombre(primero=True)
         self._mover(evento.input, 1, guardar_al_final=True)
 
     def on_key(self, evento):
@@ -183,7 +204,7 @@ class AsistenteTag(_Base):
             if isinstance(enfocado, Select) and enfocado.expanded:
                 return
             lista = self.query_one("#lista", OptionList)
-            if evento.key == "down" and enfocado.id in ("tag", "programa") and lista.option_count:
+            if evento.key == "down" and enfocado.id in ("ip", "tag", "programa") and lista.option_count:
                 self.campo_lista = enfocado.id
                 lista.highlighted = 0
                 lista.focus()
@@ -194,6 +215,14 @@ class AsistenteTag(_Base):
 
     def on_option_list_option_selected(self, evento: OptionList.OptionSelected):
         evento.prevent_default()
+        if self.campo_lista == 'ip':
+            equipo = self.equipos_lista[evento.option_index]
+            campo = self.query_one("#ip", Input)
+            campo.value = equipo['ip']
+            campo.cursor_position = len(campo.value)
+            self._mostrar_equipo(equipo)
+            self.query_one("#scope").focus()   # IP lista: sigue con el tag
+            return
         destino = self.query_one(f"#{self.campo_lista or 'tag'}", Input)
         destino.value = str(evento.option.prompt)
         destino.cursor_position = len(destino.value)
@@ -201,6 +230,43 @@ class AsistenteTag(_Base):
 
     def action_volver_al_campo(self):
         self.query_one(f"#{self.campo_lista or 'tag'}", Input).focus()
+
+    # ---------------------------------------------------------
+    # IP por nombre
+    def _resolver_nombre(self, primero=False):
+        """Si en IP quedó un nombre (no una IP), lo cambia por la IP del ACD.
+        Coincidencia exacta de nombre, o la única coincidencia; con primero=True
+        (Enter en el campo) toma la primera de la lista."""
+        campo = self.query_one("#ip", Input)
+        texto = campo.value.strip()
+        if not texto or logix_tools.es_ip(texto):
+            return
+        hallados = logix_tools.buscar_equipos(self.equipos, texto)
+        exacto = [e for e in hallados if e['nombre'].lower() == texto.lower()]
+        elegido = exacto[0] if exacto else (hallados[0] if hallados and (primero or len(hallados) == 1) else None)
+        if elegido:
+            campo.value = elegido['ip']
+            self._mostrar_equipo(elegido)
+        elif not hallados:
+            self._estado(f"'{texto}' no es una IP ni coincide con ningún ACD de la base.", error=True)
+
+    def _mostrar_equipo(self, equipo=None):
+        """Debajo de la IP: a qué ACD corresponde (si está en la base)."""
+        if equipo is None:
+            ip = self.query_one("#ip", Input).value.strip()
+            mismos = [e for e in self.equipos if e.get('ip') == ip] if logix_tools.es_ip(ip) else []
+            equipo = mismos[0] if mismos else None
+            otros = len(mismos) - 1
+        else:
+            otros = 0
+        texto = ""
+        if equipo:
+            texto = f"[#00ff00]{equipo['nombre']}[/]"
+            if equipo.get('comentario'):
+                texto += f" [#888888]·[/] {equipo['comentario']}"
+            if otros > 0:
+                texto += f" [#888888](+{otros} con la misma IP)[/]"
+        self.query_one("#equipo", Static).update(texto)
 
     def _mover(self, widget, paso, guardar_al_final=False):
         orden = self._orden()
@@ -274,6 +340,7 @@ class AsistenteTag(_Base):
 
     # ---------------------------------------------------------
     def action_guardar(self):
+        self._resolver_nombre()
         ip = self.query_one("#ip", Input).value.strip()
         programa = self.query_one("#programa", Input).value.strip() if self._es_programa() else None
         tag = self.query_one("#tag", Input).value.strip()
@@ -284,6 +351,9 @@ class AsistenteTag(_Base):
             return
         if not ip:
             self._estado("Falta la IP.", error=True)
+            return
+        if not logix_tools.es_ip(ip):
+            self._estado(f"'{ip}' no es una IP. Escribe la IP o elige un ACD de la lista (↓).", error=True)
             return
         if self._es_programa() and not programa:
             self._estado("Elegiste Subprograma: falta el nombre del programa.", error=True)

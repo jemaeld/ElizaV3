@@ -54,6 +54,13 @@ def extraer_ip_de_vnc(ruta_vnc):
         return None
 
 
+def datos_carpeta(ruta, nombre=None):
+    """Entrada DIR (carpeta que se abre en el Explorador)."""
+    ruta = os.path.normpath(ruta)
+    nombre = nombre or os.path.basename(ruta.rstrip('\\/')) or ruta
+    return {"categoria": "DIR", "nombre_sugerido": nombre, "action": f'open "{ruta}"', "ip": ""}
+
+
 def analizar_archivo(ruta_original):
     """
     Analiza el archivo soltado/elegido y regresa (datos, None) con lo que se
@@ -77,6 +84,8 @@ def analizar_archivo(ruta_original):
         destino = resolver_acceso_directo(ruta_original)
         if not destino:
             return None, f"No se pudo resolver el acceso directo: {os.path.basename(ruta_original)}"
+        if os.path.isdir(destino):   # acceso directo a una carpeta -> DIR
+            return datos_carpeta(destino, nombre_sin_ext), None
         return {
             "categoria": "APPS",
             "nombre_sugerido": nombre_sin_ext,

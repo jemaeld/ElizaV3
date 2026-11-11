@@ -49,7 +49,7 @@ from ui.scan_acd import PantallaScanACD
 from ui.logo import logo
 
 VERSION = "ELIZA v3"
-COLOR_CATEGORIA = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff"}
+COLOR_CATEGORIA = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff", 'dir': "#ff9933"}
 CATEGORIAS_CON_IP = ('vnc', 'acd')
 CODIGO_REINICIAR = 10
 
@@ -673,8 +673,8 @@ class ElizaApp(App):
     COMANDOS = {
         '/bitacora': ("Sin fecha: nuevo registro. Con fecha (hoy, ayer, DD, MM/DD): visor del día", cmd_bitacora),
         '/logix':    ("Monitor de variables Allen-Bradley: leer y escribir 1..N veces (ip/nombre opcional)", cmd_logix),
-        '/edit':     ("Editor de la base (opcional: vnc, apps, acd)", cmd_edit),
-        '/add':      ("Agregar VNC/APPS desde un archivo .vnc, .lnk o .exe", cmd_add),
+        '/edit':     ("Editor de la base (opcional: vnc, apps, acd, dir)", cmd_edit),
+        '/add':      ("Agregar VNC/APPS (.vnc, .lnk, .exe) o una carpeta DIR (Ctrl+S)", cmd_add),
         '/scan_acd': ("Buscar proyectos ACD/L5K en una carpeta y registrarlos", cmd_scan_acd),
         '/ip':       ("Ver/cambiar IP: /ip LAN 10.0.0.100 [máscara] · /ip LAN L31E125 [.249] · /ip LAN dhcp", cmd_ip),
         '/ping':     ("Ping a una IP o entrada VNC/ACD (ventana aparte); la lista muestra VNC y ACD", cmd_ping),

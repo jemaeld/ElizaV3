@@ -1,5 +1,6 @@
 """
-alta.py -- /add: agregar entradas VNC/APPS desde un archivo .vnc, .lnk o .exe.
+alta.py -- /add: agregar entradas VNC/APPS/DIR desde un archivo .vnc, .lnk o .exe,
+o una carpeta (Ctrl+S en el explorador) que se abrirá en el Explorador de Windows.
 
 1. Explorador de archivos en consola (sin ventanas de Windows).
 2. Se detecta categoría, IP (de .vnc) y destino real (de .lnk).
@@ -23,12 +24,18 @@ async def alta(app, bd, inicio=None):
     agregadas = 0
     carpeta = inicio
     while True:
-        ruta = await app.push_screen_wait(ExploradorArchivos("Agregar VNC / APPS: elige el archivo",
-                                                             EXTENSIONES, carpeta))
+        ruta = await app.push_screen_wait(ExploradorArchivos(
+            "Agregar: archivo VNC / APPS (Enter) o carpeta DIR (Ctrl+S)", EXTENSIONES, carpeta,
+            elegir_carpeta=True, texto_carpeta="agregar la carpeta"))
         if not ruta:
             return agregadas
-        carpeta = os.path.dirname(ruta)
-        datos, error = await app.run_in_thread(add_tools.analizar_archivo, ruta)
+        if isinstance(ruta, dict):   # Ctrl+S: la carpeta misma
+            ruta = ruta['carpeta']
+            carpeta = os.path.dirname(ruta.rstrip('\\/')) or ruta
+            datos, error = add_tools.datos_carpeta(ruta), None
+        else:
+            carpeta = os.path.dirname(ruta)
+            datos, error = await app.run_in_thread(add_tools.analizar_archivo, ruta)
         if error:
             app.aviso(error)
             continue
@@ -37,7 +44,8 @@ async def alta(app, bd, inicio=None):
                   Campo('ip', "IP", datos['ip'], obligatorio=es_vnc),
                   Campo('comentario', "Comentario", "", ayuda="qué equipo es, ej. Estación del Robot")]
         if not es_vnc:
-            campos.insert(1, Campo('accion', "Acción", datos['action']))
+            campos.insert(1, Campo('accion', "Acción", datos['action'],
+                                   ayuda='open "S:\\ruta\\carpeta"' if datos['categoria'] == 'DIR' else ''))
             campos = [c for c in campos if c.clave != 'ip']
         resultado = await app.push_screen_wait(Formulario(
             f"Agregar a {datos['categoria']}", campos, mensaje=os.path.basename(ruta)))
@@ -51,6 +59,6 @@ async def alta(app, bd, inicio=None):
                 app.ok(f"Agregado '{resultado['nombre']}' a {datos['categoria']}")
             except db.ErrorDB as e:
                 app.aviso(str(e))
-        if not await app.push_screen_wait(Confirmar("Agregar", "¿Agregar otro archivo?",
+        if not await app.push_screen_wait(Confirmar("Agregar", "¿Agregar otro archivo o carpeta?",
                                                     si="Sí, otro", no="Terminar")):
             return agregadas

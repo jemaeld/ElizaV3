@@ -21,7 +21,7 @@ from ui.formulario import Campo, Formulario
 from ui.modales import Confirmar
 from ui.pantalla import PantallaTabla
 
-COLORES = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff"}
+COLORES = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff", 'dir': "#ff9933"}
 ORDENES = [('nombre', "nombre"), ('ip', "IP"), ('categoria', "categoría")]
 
 
@@ -64,7 +64,7 @@ class PantallaEditor(PantallaTabla):
         self.entradas = {e['id']: e for e in self.bd.entradas()}
 
     def categorias(self):
-        base = ['vnc', 'apps', 'acd']
+        base = ['vnc', 'apps', 'acd', 'dir']
         return base + sorted({e['categoria'] for e in self.entradas.values()} - set(base))
 
     def filas(self):
@@ -93,7 +93,7 @@ class PantallaEditor(PantallaTabla):
             [Campo('categoria', "Categoría", e.get('categoria', 'vnc'), opciones=opciones),
              Campo('nombre', "Nombre", e.get('nombre', ''), obligatorio=True),
              Campo('ip', "IP", e.get('ip', '')),
-             Campo('accion', "Acción", e.get('accion', ''), ayuda='vnc <ip>  ·  open "C:\\ruta\\programa.exe"'),
+             Campo('accion', "Acción", e.get('accion', ''), ayuda='vnc <ip>  ·  open "C:\\ruta\\programa.exe"  ·  DIR: la ruta de la carpeta'),
              Campo('comentario', "Comentario", e.get('comentario', ''), ayuda="qué equipo es, ej. Estación del Robot")])
 
     @work(exclusive=True, group="editor", exit_on_error=False)
@@ -112,6 +112,9 @@ class PantallaEditor(PantallaTabla):
             return
         if datos['categoria'] == 'vnc' and not datos['accion'] and datos['ip']:
             datos['accion'] = f"vnc {datos['ip']}"
+        accion = datos.get('accion', '').strip()
+        if datos['categoria'] in ('dir', 'apps') and accion and not accion.lower().startswith(('open ', 'vnc ')):
+            datos['accion'] = f'open "{accion.strip(chr(34))}"'   # ruta pegada tal cual -> open "ruta"
         try:
             nuevo_id = self.bd.guardar_entrada(datos, id_entrada)
         except db.ErrorDB as e:

@@ -82,10 +82,11 @@ class ArbolFiltrado(DirectoryTree):
 class ExploradorArchivos(_Base):
     BINDINGS = [Binding("ctrl+s", "elegir_carpeta", show=False, priority=True)]
 
-    def __init__(self, titulo, extensiones, inicio=None, mostrar_fechas=False, elegir_carpeta=False):
+    def __init__(self, titulo, extensiones, inicio=None, mostrar_fechas=False, elegir_carpeta=False,
+                 texto_carpeta="buscar en la carpeta"):
         ayuda = "Enter elige · Backspace sube · Tab ruta/árbol · Esc cancela"
         if elegir_carpeta:
-            ayuda = "Enter abre/elige · Ctrl+S buscar en la carpeta · Backspace sube · Esc"
+            ayuda = f"Enter abre/elige · Ctrl+S {texto_carpeta} · Backspace sube · Esc"
         super().__init__(titulo, ayuda)
         self.extensiones = extensiones
         self.mostrar_fechas = mostrar_fechas

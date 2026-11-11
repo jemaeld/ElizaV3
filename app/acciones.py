@@ -4,6 +4,7 @@ acciones.py
 Ejecutar una entrada de la base (lo que pasa al escribir su nombre y Enter):
 - VNC  -> archivo .vnc temporal con host/puerto/contraseña y se abre con el
           visor asociado.
+- DIR    -> abre la carpeta en el Explorador de Windows.
 - Resto (APPS, ACD, ...) -> os.startfile de la ruta del 'accion'. Las rutas
           relativas (_acd_store/...) se resuelven contra la carpeta de datos.
 
@@ -60,6 +61,8 @@ def ejecutar(entrada, carpeta_datos, config):
         ruta = acd_tools.resolver_ruta_action(entrada.get('accion', ''), carpeta_datos)
         if not ruta:
             return False, f"'{nombre}' no tiene acción registrada."
+        if entrada.get('categoria') == 'dir' and not os.path.isdir(ruta):
+            return False, f"'{nombre}': la carpeta no existe o no hay acceso ({ruta}). ¿Unidad de red desconectada?"
         os.startfile(ruta)
         return True, f"Abriendo {nombre}"
     except OSError as e:

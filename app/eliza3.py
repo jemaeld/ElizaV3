@@ -10,6 +10,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import rutas  # noqa: E402
+from ui import compat  # noqa: E402
+
+compat.aplicar(rutas.leer_local())   # consola clásica de Windows 10: caracteres seguros
+
 from ui.app import ElizaApp  # noqa: E402
 
 

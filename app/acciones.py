@@ -31,13 +31,25 @@ def _limpiar_vnc_temporales():
             pass
 
 
+def destino_vnc(entrada, puerto_defecto=5900):
+    """(host, puerto) para VNC. Acepta 'host:puerto' en IP o en 'vnc host:puerto'
+    (el VNC propio de VMware usa un puerto distinto por VM, ej. 127.0.0.1:5901)."""
+    texto = (entrada.get('ip') or '').strip()
+    accion = (entrada.get('accion') or '').strip()
+    desde_accion = accion[4:].strip() if accion.lower().startswith('vnc ') else ''
+    if not texto or (':' not in texto and desde_accion.split(':')[0] == texto and ':' in desde_accion):
+        texto = desde_accion or texto
+    host, _, puerto = texto.partition(':')
+    try:
+        puerto = int(puerto) if puerto else int(puerto_defecto)
+    except ValueError:
+        puerto = int(puerto_defecto)
+    return host.strip(), puerto
+
+
 def ip_de_entrada(entrada):
-    ip = (entrada.get('ip') or '').strip()
-    if not ip:
-        accion = (entrada.get('accion') or '').strip()
-        if accion.lower().startswith('vnc '):
-            ip = accion[4:].strip()
-    return ip
+    """Solo el host (sin puerto): para ping, /ip, búsquedas."""
+    return destino_vnc(entrada)[0]
 
 
 def lanzar_vnc(ip, password, puerto=5900):
@@ -53,11 +65,11 @@ def ejecutar(entrada, carpeta_datos, config):
     nombre = entrada.get('nombre', '')
     try:
         if entrada.get('categoria') == 'vnc':
-            ip = ip_de_entrada(entrada)
+            ip, puerto = destino_vnc(entrada, config.get('vnc_puerto', 5900))
             if not ip:
                 return False, f"'{nombre}' no tiene IP registrada."
-            lanzar_vnc(ip, config.get('vnc_password', ''), config.get('vnc_puerto', 5900))
-            return True, f"VNC → {nombre} ({ip})"
+            lanzar_vnc(ip, config.get('vnc_password', ''), puerto)
+            return True, f"VNC → {nombre} ({ip}{'' if puerto == 5900 else f':{puerto}'})"
         ruta = acd_tools.resolver_ruta_action(entrada.get('accion', ''), carpeta_datos)
         if not ruta:
             return False, f"'{nombre}' no tiene acción registrada."

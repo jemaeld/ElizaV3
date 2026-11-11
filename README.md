@@ -70,10 +70,12 @@ Todo con teclado, desde la línea `ELIZA>`:
 | `/bitacora` | captura un registro (formulario; fecha y hora automáticas) |
 | `/bitacora hoy` · `ayer` · `DD` · `MM/DD` · `YYYY-MM-DD` | visor del día: ←/→ cambia de día, n nuevo, Enter editar, Supr borrar, y copiar a Excel, x exportar .tsv |
 | `/edit [vnc\|apps\|acd]` | editor de la base: Enter editar, n nueva, Supr borrar, c categoría, o orden; muestra cuándo y quién abrió cada entrada por última vez |
-| `/add` | agregar VNC/APPS eligiendo un .vnc/.lnk/.exe en un explorador de consola, o una **carpeta** con Ctrl+S (categoría DIR: Enter la abre en el Explorador de Windows; un .lnk a carpeta también queda como DIR) |
+| `/add` | agregar VNC/APPS eligiendo un .vnc/.lnk/.exe en un explorador de consola, un `.vmx` de VMware (categoría VM: nombre y puerto VNC se leen del .vmx), o una **carpeta** con Ctrl+S (categoría DIR: Enter la abre en el Explorador de Windows; un .lnk a carpeta también queda como DIR) |
+| `/vm [nombre]` | máquinas virtuales de VMware Workstation con su estado (● corriendo / ○ apagada). Enter: apagada → arranca sin ventana; corriendo → VNC propio de VMware (`127.0.0.1:puerto`). `a` arrancar, `s` apagado limpio, `f` forzar apagado (ambos piden confirmar), `v` VNC, `r` refrescar. En el lanzador, Enter sobre una VM hace lo mismo. Arrancar nunca conecta el VNC solo. `vmrun.exe` se busca en Program Files o en `"vmrun"` de `eliza_local.json` |
 | `/scan_acd [carpeta]` | explorador de carpetas con los .ACD/.L5K y su fecha (más reciente primero): Ctrl+S busca en la carpeta (y subcarpetas) y los enlista; Enter sobre un archivo lo registra directo. En la tabla: Enter registrar, a abrir, u ubicación, s explorar. Recuerda la última carpeta |
 | `/logix [ip\|nombre]` | **Monitor de variables** Allen-Bradley (ver abajo) |
 | `/ip` | la lista muestra los adaptadores con su IP; `/ip LAN 10.0.0.100 [255.255.0.0 \| /16]` IP fija (máscara 255.255.255.0 si no se indica, sin gateway) · `/ip LAN L31E125 [.249]` misma subred del PLC, terminación .250 por defecto · `/ip LAN dhcp`. Pide confirmar; si Windows lo exige, pide permiso de administrador solo para ese cambio |
+| VNC con puerto | una entrada VNC puede llevar `host:puerto` (en IP o en `vnc host:puerto`); sin puerto usa el general |
 | `/ping` | la lista muestra VNC y ACD (filtra por nombre, IP o comentario); Enter hace ping en ventana aparte |
 | `/settings` · `/reload` · `/update` | carpeta de datos · recargar · actualizar |
 | `/clear` · `/help` · `/salir` | |

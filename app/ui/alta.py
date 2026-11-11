@@ -16,7 +16,7 @@ from ui.explorador import ExploradorArchivos
 from ui.formulario import Campo, Formulario
 from ui.modales import Confirmar
 
-EXTENSIONES = ('.vnc', '.lnk', '.exe')
+EXTENSIONES = ('.vnc', '.lnk', '.exe', '.vmx')
 
 
 async def alta(app, bd, inicio=None):
@@ -25,7 +25,7 @@ async def alta(app, bd, inicio=None):
     carpeta = inicio
     while True:
         ruta = await app.push_screen_wait(ExploradorArchivos(
-            "Agregar: archivo VNC / APPS (Enter) o carpeta DIR (Ctrl+S)", EXTENSIONES, carpeta,
+            "Agregar: archivo VNC / APPS / VM (Enter) o carpeta DIR (Ctrl+S)", EXTENSIONES, carpeta,
             elegir_carpeta=True, texto_carpeta="agregar la carpeta"))
         if not ruta:
             return agregadas
@@ -40,13 +40,16 @@ async def alta(app, bd, inicio=None):
             app.aviso(error)
             continue
         es_vnc = datos['categoria'] == 'VNC'
+        es_vm = datos['categoria'] == 'VM'
         campos = [Campo('nombre', "Nombre", datos['nombre_sugerido'], obligatorio=True),
-                  Campo('ip', "IP", datos['ip'], obligatorio=es_vnc),
+                  Campo('ip', "VNC" if es_vm else "IP", datos['ip'], obligatorio=es_vnc,
+                        ayuda="VNC de VMware: 127.0.0.1:puerto (vacío = sin VNC)" if es_vm else ""),
                   Campo('comentario', "Comentario", "", ayuda="qué equipo es, ej. Estación del Robot")]
         if not es_vnc:
             campos.insert(1, Campo('accion', "Acción", datos['action'],
                                    ayuda='open "S:\\ruta\\carpeta"' if datos['categoria'] == 'DIR' else ''))
-            campos = [c for c in campos if c.clave != 'ip']
+            if not es_vm:
+                campos = [c for c in campos if c.clave != 'ip']
         resultado = await app.push_screen_wait(Formulario(
             f"Agregar a {datos['categoria']}", campos, mensaje=os.path.basename(ruta)))
         if resultado:

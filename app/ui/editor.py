@@ -17,11 +17,12 @@ from textual import work
 from textual.binding import Binding
 
 import db
+import vm_tools
 from ui.formulario import Campo, Formulario
 from ui.modales import Confirmar
 from ui.pantalla import PantallaTabla
 
-COLORES = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff", 'dir': "#ff9933"}
+COLORES = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff", 'dir': "#ff9933", 'vm': "#66ff99"}
 ORDENES = [('nombre', "nombre"), ('ip', "IP"), ('categoria', "categoría")]
 
 
@@ -64,7 +65,7 @@ class PantallaEditor(PantallaTabla):
         self.entradas = {e['id']: e for e in self.bd.entradas()}
 
     def categorias(self):
-        base = ['vnc', 'apps', 'acd', 'dir']
+        base = ['vnc', 'apps', 'acd', 'dir', 'vm']
         return base + sorted({e['categoria'] for e in self.entradas.values()} - set(base))
 
     def filas(self):
@@ -93,7 +94,7 @@ class PantallaEditor(PantallaTabla):
             [Campo('categoria', "Categoría", e.get('categoria', 'vnc'), opciones=opciones),
              Campo('nombre', "Nombre", e.get('nombre', ''), obligatorio=True),
              Campo('ip', "IP", e.get('ip', '')),
-             Campo('accion', "Acción", e.get('accion', ''), ayuda='vnc <ip>  ·  open "C:\\ruta\\programa.exe"  ·  DIR: la ruta de la carpeta'),
+             Campo('accion', "Acción", e.get('accion', ''), ayuda='vnc <ip>  ·  open "C:\\ruta\\programa.exe"  ·  DIR: ruta de la carpeta  ·  VM: ruta del .vmx'),
              Campo('comentario', "Comentario", e.get('comentario', ''), ayuda="qué equipo es, ej. Estación del Robot")])
 
     @work(exclusive=True, group="editor", exit_on_error=False)
@@ -113,6 +114,8 @@ class PantallaEditor(PantallaTabla):
         if datos['categoria'] == 'vnc' and not datos['accion'] and datos['ip']:
             datos['accion'] = f"vnc {datos['ip']}"
         accion = datos.get('accion', '').strip()
+        if datos['categoria'] == 'vm' and accion and not accion.lower().startswith('vm '):
+            datos['accion'] = vm_tools.accion_de(accion.strip(chr(34)))   # ruta del .vmx pegada tal cual
         if datos['categoria'] in ('dir', 'apps') and accion and not accion.lower().startswith(('open ', 'vnc ')):
             datos['accion'] = f'open "{accion.strip(chr(34))}"'   # ruta pegada tal cual -> open "ruta"
         try:

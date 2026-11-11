@@ -62,6 +62,13 @@ def datos_carpeta(ruta, nombre=None):
 
 
 def analizar_archivo(ruta_original):
+    if os.path.splitext(ruta_original)[1].lower() == '.vmx':
+        import vm_tools
+        return vm_tools.datos_de_vmx(ruta_original)
+    return _analizar_archivo(ruta_original)
+
+
+def _analizar_archivo(ruta_original):
     """
     Analiza el archivo soltado/elegido y regresa (datos, None) con lo que se
     pudo detectar automáticamente:
@@ -101,4 +108,4 @@ def analizar_archivo(ruta_original):
             "ip": "",
         }, None
 
-    return None, f"Extensión no soportada: '{ext or '(sin extensión)'}'. Usa .vnc, .lnk o .exe."
+    return None, f"Extensión no soportada: '{ext or '(sin extensión)'}'. Usa .vnc, .lnk, .exe o .vmx."

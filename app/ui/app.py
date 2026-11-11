@@ -33,6 +33,7 @@ from textual.containers import Horizontal
 from textual.widgets import DataTable, Footer, Input, RichLog, Static
 
 import acciones
+import vm_tools
 import ip_tools
 import bitacora_json
 import bitacora_tools
@@ -46,10 +47,11 @@ from ui import alta, bitacora, modales
 from ui.editor import PantallaEditor
 from ui.logix import PantallaLogix
 from ui.scan_acd import PantallaScanACD
+from ui.vms import PantallaVMs, texto_estado
 from ui.logo import logo
 
 VERSION = "ELIZA v3"
-COLOR_CATEGORIA = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff", 'dir': "#ff9933"}
+COLOR_CATEGORIA = {'vnc': "#00ffff", 'apps': "#ffff66", 'acd': "#ff66ff", 'dir': "#ff9933", 'vm': "#66ff99"}
 CATEGORIAS_CON_IP = ('vnc', 'acd')
 CODIGO_REINICIAR = 10
 
@@ -295,11 +297,60 @@ class ElizaApp(App):
 
     # ---------------------------------------------------------
     # Datos y tabla
+    # ---------------------------------------------------------
+    # Máquinas virtuales (categoría VM)
+    vms_encendidas = set()
+
+    def _hay_vms(self):
+        return any(e['categoria'] == 'vm' for e in getattr(self, 'entradas', []))
+
+    @work(thread=True, exclusive=True, group="vm_estado", exit_on_error=False)
+    def leer_estado_vms(self):
+        if not self._hay_vms():
+            return
+        try:
+            encendidas = vm_tools.encendidas(vm_tools.encontrar_vmrun(rutas.leer_local()))
+        except vm_tools.ErrorVM:
+            return
+        if encendidas != self.vms_encendidas:
+            self.vms_encendidas = encendidas
+            self.call_from_thread(self.filtrar, self.query_one("#linea", Input).value)
+
+    @work(thread=True, group="vm_accion", exit_on_error=False)
+    def abrir_vm(self, e):
+        """Enter sobre una VM: apagada -> arrancar (sin VNC); corriendo -> VNC."""
+        vmrun = vm_tools.encontrar_vmrun(rutas.leer_local())
+        try:
+            self.vms_encendidas = vm_tools.encendidas(vmrun)
+            estado = vm_tools.estado(e, self.vms_encendidas)
+            if estado == vm_tools.NO_DISPONIBLE:
+                raise vm_tools.ErrorVM(f"No existe {vm_tools.ruta_vmx(e)} en esta PC.")
+            if estado == vm_tools.CORRIENDO:
+                if not e['ip']:
+                    self.call_from_thread(self.info, f"{e['nombre']} está corriendo (sin VNC configurado).")
+                    return
+                ok, mensaje = acciones.ejecutar({'categoria': 'vnc', 'nombre': e['nombre'], 'ip': e['ip']},
+                                                self.carpeta, self.config)
+                self.call_from_thread(self.ok if ok else self.aviso, mensaje)
+                if ok:
+                    self.call_from_thread(self.registrar_apertura, e)
+                return
+            self.call_from_thread(self.info, f"Arrancando {e['nombre']} (sin ventana)…")
+            mensaje = vm_tools.arrancar(vmrun, e)
+            self.call_from_thread(self.ok, mensaje + (" Enter otra vez para VNC." if e['ip'] else ""))
+            self.call_from_thread(self.registrar_apertura, e)
+        except vm_tools.ErrorVM as error:
+            self.call_from_thread(self.aviso, f"{e['nombre']}: {error}")
+        self.leer_estado_vms()
+
     def recargar(self, silencioso=False):
         self.config = self.bd.config()
         self.entradas = sorted(self.bd.entradas(), key=lambda e: (e['categoria'], orden_natural(e['nombre'])))
         self.actualizar_info()
         self.filtrar(self.query_one("#linea", Input).value)
+        self.leer_estado_vms()
+        if not hasattr(self, '_reloj_vms'):
+            self._reloj_vms = self.set_interval(15, self.leer_estado_vms)
         if not silencioso:
             self.ok(f"Base recargada: {len(self.entradas)} entradas.")
 
@@ -344,8 +395,10 @@ class ElizaApp(App):
             pajar = f"{e['categoria']} {e['nombre']} {e['ip']} {e['comentario']}".lower()
             if all(p in pajar for p in palabras):
                 color = COLOR_CATEGORIA.get(e['categoria'], "#ffffff")
-                tabla.add_row(Text(e['categoria'].upper(), style=f"bold {color}"), e['nombre'], e['ip'],
-                              e['comentario'] or Text(texto_fecha(e), style="#808080"))
+                detalle = e['comentario'] or Text(texto_fecha(e), style="#808080")
+                if e['categoria'] == 'vm':   # estado de la VM delante del comentario
+                    detalle = Text.assemble(texto_estado(vm_tools.estado(e, self.vms_encendidas)), "  ", detalle)
+                tabla.add_row(Text(e['categoria'].upper(), style=f"bold {color}"), e['nombre'], e['ip'], detalle)
                 self.filas_visibles.append(('entrada', e))
         if texto and not self.filas_visibles:
             self.filas_visibles = []
@@ -490,6 +543,10 @@ class ElizaApp(App):
             self.query_one("#linea", Input).value = ""
             self.COMANDOS[fila[1]][1](self, "")
             return
+        if fila[1]['categoria'] == 'vm':
+            self.query_one("#linea", Input).value = ""
+            self.abrir_vm(fila[1])
+            return
         exito, mensaje = acciones.ejecutar(fila[1], self.carpeta, self.config)
         (self.ok if exito else self.aviso)(mensaje)
         if exito:
@@ -599,6 +656,12 @@ class ElizaApp(App):
             self.recargar()
 
     @work(exclusive=True, group="pantalla", exit_on_error=False)
+    async def cmd_vm(self, arg):
+        await self.push_screen_wait(PantallaVMs(self.bd, arg))
+        self.leer_estado_vms()
+        self.filtrar(self.query_one("#linea", Input).value)
+
+    @work(exclusive=True, group="pantalla", exit_on_error=False)
     async def cmd_add(self, arg):
         if await alta.alta(self, self.bd, arg or None):
             self.recargar()
@@ -673,8 +736,9 @@ class ElizaApp(App):
     COMANDOS = {
         '/bitacora': ("Sin fecha: nuevo registro. Con fecha (hoy, ayer, DD, MM/DD): visor del día", cmd_bitacora),
         '/logix':    ("Monitor de variables Allen-Bradley: leer y escribir 1..N veces (ip/nombre opcional)", cmd_logix),
-        '/edit':     ("Editor de la base (opcional: vnc, apps, acd, dir)", cmd_edit),
-        '/add':      ("Agregar VNC/APPS (.vnc, .lnk, .exe) o una carpeta DIR (Ctrl+S)", cmd_add),
+        '/edit':     ("Editor de la base (opcional: vnc, apps, acd, dir, vm)", cmd_edit),
+        '/add':      ("Agregar VNC/APPS (.vnc, .lnk, .exe), VM (.vmx) o una carpeta DIR (Ctrl+S)", cmd_add),
+        '/vm':       ("Máquinas virtuales VMware: arrancar, apagar, forzar, VNC y estado", cmd_vm),
         '/scan_acd': ("Buscar proyectos ACD/L5K en una carpeta y registrarlos", cmd_scan_acd),
         '/ip':       ("Ver/cambiar IP: /ip LAN 10.0.0.100 [máscara] · /ip LAN L31E125 [.249] · /ip LAN dhcp", cmd_ip),
         '/ping':     ("Ping a una IP o entrada VNC/ACD (ventana aparte); la lista muestra VNC y ACD", cmd_ping),
